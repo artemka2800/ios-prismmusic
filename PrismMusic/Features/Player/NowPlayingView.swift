@@ -198,14 +198,7 @@ struct NowPlayingView: View {
                         }
                         .transition(.opacity)
                     } else if panel == .queue {
-                        QueueView(
-                            queue: app.audio.queue,
-                            currentIndex: app.audio.currentIndex,
-                            isPlaying: app.audio.isPlaying,
-                            onSelectTrack: { index in
-                                app.audio.play(queue: app.audio.queue, startAt: index)
-                            }
-                        )
+                        QueueView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
                     } else {

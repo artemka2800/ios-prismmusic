@@ -100,7 +100,7 @@ final class APIClient {
 
     /// `POST /api/music/yandex/import` — imports Yandex Liked tracks.
     func importYandexLikes() async throws -> YandexImportResponse {
-        var components = try makeComponents(path: "/api/music/yandex/import")
+        let components = try makeComponents(path: "/api/music/yandex/import")
         guard let url = components.url else { throw APIError.invalidBackendURL }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
