@@ -228,4 +228,6 @@ enum LyricsParser {
         }
 
         return synthesizedWords
+    }
 }
+
