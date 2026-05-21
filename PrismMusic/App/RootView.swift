@@ -12,6 +12,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppState.self) private var app
     @State private var nowPlayingPresented = false
+    @State private var showCrashReport = false
 
     var body: some View {
         ZStack {
@@ -45,6 +46,22 @@ struct RootView: View {
             Button("ОК", role: .cancel) { }
         } message: {
             Text(app.audio.errorMessage ?? "Неизвестная ошибка")
+        }
+        .onAppear {
+            if CrashReporter.shared.lastCrashReport != nil {
+                showCrashReport = true
+            }
+        }
+        .alert("Crash Report", isPresented: $showCrashReport) {
+            Button("Скопировать и закрыть") {
+                if let report = CrashReporter.shared.lastCrashReport {
+                    UIPasteboard.general.string = report
+                }
+                CrashReporter.shared.lastCrashReport = nil
+                showCrashReport = false
+            }
+        } message: {
+            Text(CrashReporter.shared.lastCrashReport ?? "")
         }
     }
 }

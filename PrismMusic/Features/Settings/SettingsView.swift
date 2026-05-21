@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var tokenDraft: String = ""
     @State private var showTokenInfo = false
     @State private var savedFlash = false
+    @State private var showDebugLogs = false
+    @State private var logsContent = ""
 
     var body: some View {
         NavigationStack {
@@ -65,6 +67,24 @@ struct SettingsView: View {
 
                 Section {
                     Button {
+                        logsContent = DebugLogger.shared.readLogs()
+                        showDebugLogs = true
+                    } label: {
+                        Label("Посмотреть логи (Debug)", systemImage: "ladybug")
+                            .foregroundStyle(.white)
+                    }
+                    Button {
+                        DebugLogger.shared.clearLogs()
+                    } label: {
+                        Label("Очистить логи", systemImage: "trash")
+                            .foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("Отладка")
+                }
+
+                Section {
+                    Button {
                         save()
                     } label: {
                         HStack {
@@ -91,6 +111,23 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("1. Открой music.yandex.ru\n2. DevTools → Application → Cookies → Session_id\n3. Скопируй и вставь сюда. Также можно получить через oauth.yandex.com.")
+            }
+            .sheet(isPresented: $showDebugLogs) {
+                NavigationStack {
+                    ScrollView {
+                        Text(logsContent)
+                            .font(.system(size: 10, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                    }
+                    .navigationTitle("Логи")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Закрыть") { showDebugLogs = false }
+                        }
+                    }
+                }
             }
         }
         .onAppear {

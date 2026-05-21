@@ -16,6 +16,11 @@ struct PrismMusicApp: App {
     /// the type drives view updates.
     @State private var appState = AppState()
 
+    init() {
+        CrashReporter.shared.start()
+        DebugLogger.shared.start()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
