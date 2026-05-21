@@ -53,6 +53,7 @@ targets:
           UIImageName: ""
         UIBackgroundModes:
           - audio
+        NSMotionUsageDescription: "Требуется для параллакс-эффекта обложек при наклоне устройства."
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
