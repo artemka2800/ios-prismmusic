@@ -254,9 +254,11 @@ final class AudioPlayer {
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             Task { @MainActor in
                 guard let self else { return }
-                self.progress = time.seconds
+                let seconds = time.seconds
+                guard seconds.isFinite else { return }
+                self.progress = seconds
                 // Refresh Live Activity occasionally — every ~1s is enough.
-                if Int(time.seconds * 4) % 4 == 0 {
+                if Int(seconds * 4) % 4 == 0 {
                     self.liveActivity.update(state: self.liveActivityState)
                     self.updateNowPlaying()
                 }

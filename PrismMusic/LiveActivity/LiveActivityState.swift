@@ -32,14 +32,15 @@ struct LiveActivityAttributes: ActivityAttributes {
 
         /// Convenience: progress as a 0...1 fraction, clamped.
         var fraction: Double {
-            guard duration > 0 else { return 0 }
+            guard duration.isFinite, progress.isFinite, duration > 0 else { return 0 }
             return max(0, min(1, progress / duration))
         }
 
         /// Convenience: m:ss remaining.
         var remainingLabel: String {
-            guard duration > 0 else { return "—" }
+            guard duration.isFinite, progress.isFinite, duration > 0 else { return "—" }
             let remaining = max(0, duration - progress)
+            guard remaining.isFinite else { return "—" }
             let m = Int(remaining) / 60
             let s = Int(remaining) % 60
             return String(format: "-%d:%02d", m, s)

@@ -22,9 +22,11 @@ final class NowPlayingManager {
         if let album = track.album {
             info[MPMediaItemPropertyAlbumTitle] = album
         }
-        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = progress
+        if progress.isFinite {
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = progress
+        }
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
-        if duration > 0 {
+        if duration.isFinite, duration > 0 {
             info[MPMediaItemPropertyPlaybackDuration] = duration
         }
         info[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
