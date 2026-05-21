@@ -123,8 +123,8 @@ jobs:
       #   1. _CodeSignature contains invalid/partial signatures
       #   2. The binary has an ad-hoc signature (CODE_SIGN_IDENTITY="-")
       #
-      # Fix: strip ALL _CodeSignature dirs and codesign residue.
-      # AltStore/Sideloadly sign from scratch — they don't need existing sigs.
+      # Fix: strip old signatures, convert binary plists to XML, then
+      # ad-hoc sign so AltStore can parse the Mach-O headers.
       - name: Create unsigned IPA
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
@@ -134,27 +134,59 @@ jobs:
           mkdir -p build/ipa-staging/Payload
           cp -R "$APP_PATH" build/ipa-staging/Payload/
 
-          # CRITICAL: Strip ALL code signatures — AltStore re-signs everything.
-          # Leaving stale/invalid _CodeSignature dirs causes error 2005.
-          echo "Stripping code signatures..."
+          # ── Step 1: Strip ALL old code signatures ─────────────────
+          echo "Stripping old code signatures..."
           find build/ipa-staging/Payload -name "_CodeSignature" -type d -exec rm -rf {} + 2>/dev/null || true
           find build/ipa-staging/Payload -name "*.mobileprovision" -delete 2>/dev/null || true
 
-          # Also strip any embedded.mobileprovision
-          rm -f build/ipa-staging/Payload/PrismMusic.app/embedded.mobileprovision 2>/dev/null || true
+          # ── Step 2: Convert binary plists to XML ──────────────────
+          # AltStore/Sideloadly sometimes fail with NSCocoaErrorDomain 3840
+          # when Info.plist is in binary format. Convert all to XML1.
+          echo "Converting binary plists to XML..."
+          find build/ipa-staging/Payload -name "*.plist" -exec sh -c '
+            for f; do
+              if file "$f" | grep -q "Apple binary property list"; then
+                plutil -convert xml1 "$f" && echo "  Converted: $f"
+              fi
+            done
+          ' _ {} +
 
-          # Re-create minimal _CodeSignature with empty CodeResources for AltStore
-          # Some versions of AltStore expect the directory to exist, even if empty.
-          # We'll leave it stripped — modern AltStore handles both.
+          # ── Step 3: Ad-hoc sign the binary ────────────────────────
+          # AltStore requires valid Mach-O signature headers to parse
+          # the app. A bare ad-hoc signature (no identity) satisfies this
+          # without requiring a certificate. AltStore replaces it when
+          # it installs the app.
+          echo "Ad-hoc signing main binary..."
+          MAIN_APP="build/ipa-staging/Payload/PrismMusic.app"
 
+          # Sign frameworks first (if any)
+          if [ -d "$MAIN_APP/Frameworks" ]; then
+            for fw in "$MAIN_APP"/Frameworks/*.framework "$MAIN_APP"/Frameworks/*.dylib 2>/dev/null; do
+              [ -e "$fw" ] || continue
+              codesign --force --sign - --timestamp=none "$fw" 2>/dev/null && echo "  Signed framework: $(basename $fw)" || true
+            done
+          fi
+
+          # Sign extensions (PlugIns)
+          if [ -d "$MAIN_APP/PlugIns" ]; then
+            for ext in "$MAIN_APP"/PlugIns/*.appex 2>/dev/null; do
+              [ -e "$ext" ] || continue
+              codesign --force --sign - --timestamp=none "$ext" 2>/dev/null && echo "  Signed extension: $(basename $ext)" || true
+            done
+          fi
+
+          # Sign main app last
+          codesign --force --sign - --timestamp=none "$MAIN_APP" && echo "  Signed: PrismMusic.app"
+
+          echo ""
           echo "Frameworks in bundle:"
-          ls -la build/ipa-staging/Payload/PrismMusic.app/Frameworks/ 2>/dev/null || echo "(no frameworks)"
-
+          ls -la "$MAIN_APP/Frameworks/" 2>/dev/null || echo "(no frameworks)"
           echo "PlugIns in bundle:"
-          ls -la build/ipa-staging/Payload/PrismMusic.app/PlugIns/ 2>/dev/null || echo "(no plugins)"
+          ls -la "$MAIN_APP/PlugIns/" 2>/dev/null || echo "(no plugins)"
 
-          # Create the IPA
+          # ── Step 4: Create the IPA ────────────────────────────────
           cd build/ipa-staging
+          # Use -y to preserve symlinks (important for frameworks)
           zip -ry "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa" Payload/
           ls -lh "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa"
 

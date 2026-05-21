@@ -103,7 +103,9 @@ final class APIClient {
     private func request<T: Decodable>(_ components: URLComponents, as: T.Type) async throws -> T {
         guard let url = components.url else { throw APIError.invalidBackendURL }
         var req = URLRequest(url: url)
-        req.cachePolicy = .returnCacheDataElseLoad
+        // Use reloadRevalidating so we don't serve stale cached JSON
+        // from a previous app version with a different response schema.
+        req.cachePolicy = .reloadRevalidatingCacheData
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let (data, response) = try await session.data(for: req)
@@ -112,7 +114,16 @@ final class APIClient {
             let bodyPreview = String(data: data.prefix(APIConfig.errorBodyLogLimit), encoding: .utf8)
             throw APIError.httpStatus(http.statusCode, bodyPreview)
         }
-        return try decoder.decode(T.self, from: data)
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            // Log raw JSON on decode failure to aid debugging.
+            let preview = String(data: data.prefix(512), encoding: .utf8) ?? "(binary)"
+            print("[APIClient] JSON decode failed for \(T.self):")
+            print("[APIClient]   error: \(error)")
+            print("[APIClient]   body preview: \(preview)")
+            throw error
+        }
     }
 }
 

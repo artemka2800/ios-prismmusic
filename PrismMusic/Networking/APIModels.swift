@@ -8,7 +8,8 @@
 
 import Foundation
 
-/// `GET /api/music/search` — returns tracks + albums + artists.
+/// `GET /api/music/search` — returns tracks + playlists + artists.
+/// Backend sends `playlists` key, not `albums`.
 struct SearchResponse: Decodable, Sendable {
     let tracks: [Track]
     let albums: [Album]?
@@ -17,11 +18,40 @@ struct SearchResponse: Decodable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.tracks = (try? container.decode([Track].self, forKey: .tracks)) ?? []
-        self.albums = try? container.decode([Album].self, forKey: .albums)
+
+        // Backend sends playlists, not albums. Map playlists → albums.
+        if let playlists = try? container.decode([SearchPlaylistDTO].self, forKey: .playlists) {
+            self.albums = playlists.compactMap { p in
+                Album(
+                    id: p.id,
+                    title: p.name ?? "Плейлист",
+                    artist: p.description ?? "SoundCloud",
+                    year: nil,
+                    cover: p.coverUrl.flatMap { URL(string: $0) },
+                    source: .soundcloud,
+                    tracks: nil
+                )
+            }
+        } else {
+            self.albums = try? container.decode([Album].self, forKey: .albums)
+        }
     }
 
     enum CodingKeys: String, CodingKey {
-        case tracks, albums
+        case tracks, albums, playlists
+    }
+}
+
+/// DTO for playlists in search results.
+private struct SearchPlaylistDTO: Decodable, Sendable {
+    let id: String
+    let name: String?
+    let coverUrl: String?
+    let description: String?
+    let source: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, coverUrl, description, source
     }
 }
 
@@ -71,6 +101,7 @@ struct RecommendationsResponse: Decodable, Sendable {
 }
 
 /// Internal DTO matching the backend's playlist shape.
+/// All fields are optional/flexible to prevent decode failures.
 private struct PlaylistDTO: Decodable, Sendable {
     let id: String
     let name: String
@@ -78,7 +109,13 @@ private struct PlaylistDTO: Decodable, Sendable {
     let description: String?
     let source: String?
     let isSystem: Bool?
-    let tracks: [Track]?
+    // `tracks` is intentionally omitted — we don't need playlist tracks
+    // from the recommendations endpoint, and including it risks decode
+    // failures if the track format differs from our Track model.
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, coverUrl, description, source, isSystem
+    }
 }
 
 /// `GET /api/music/lyrics` — raw LRC blob.
