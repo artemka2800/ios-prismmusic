@@ -44,23 +44,33 @@ enum LyricsParser {
             // The lyric body is whatever follows the LAST line-level timestamp.
             let lastTS = tsMatches.last!
             guard let lastRange = Range(lastTS.range, in: line) else { continue }
-            let body = String(line[lastRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+            var body = String(line[lastRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+
+            // Clean up empty parens and brackets:
+            body = body.replacingOccurrences(of: "\\(\\s*\\)", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\[\\s*\\]", with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespaces)
+
+            // Get first timestamp without offset to pass to parseWords (for prefix)
+            let baseTimeWithoutOffset = decodeTimestamp(tsMatches[0], in: line, offset: 0) ?? 0.0
 
             // Optionally extract word-level timestamps from the body.
-            let (cleanText, words) = parseWords(body: body, regex: wordRegex)
+            let (cleanText, words) = parseWords(body: body, regex: wordRegex, firstLineTimestampWithoutOffset: baseTimeWithoutOffset)
 
+            let baseTime = decodeTimestamp(tsMatches[0], in: line, offset: offset) ?? 0.0
             for tsMatch in tsMatches {
                 guard let t = decodeTimestamp(tsMatch, in: line, offset: offset) else { continue }
-                let adjustedWords = words.map { word in
+                let baseShift = t - baseTime
+                let adjustedWords = words.isEmpty ? nil : words.map { word in
                     // For repeated timestamps we copy the words but anchor them
-                    // to this line's start instead of the first occurrence.
-                    LyricsWord(time: word.time, text: word.text)
+                    // to this line's start instead of the first occurrence. Also add offset.
+                    LyricsWord(time: word.time + offset + baseShift, text: word.text)
                 }
                 lines.append(LyricsLine(
                     time: t,
                     endTime: nil,
                     text: cleanText,
-                    words: adjustedWords.isEmpty ? nil : adjustedWords
+                    words: adjustedWords
                 ))
             }
         }
@@ -112,34 +122,49 @@ enum LyricsParser {
         return minutes * 60 + seconds + fraction + offset
     }
 
-    private static func parseWords(body: String, regex: NSRegularExpression) -> (String, [LyricsWord]) {
+    private static func parseWords(body: String, regex: NSRegularExpression, firstLineTimestampWithoutOffset: Double) -> (String, [LyricsWord]) {
         let nsBody = body as NSString
         let matches = regex.matches(in: body, range: NSRange(location: 0, length: nsBody.length))
-        guard !matches.isEmpty else { return (body, []) }
-
+        
         var words: [LyricsWord] = []
         var cleanText = body
-        // We need pairs of (time-stamp, text-until-next-stamp). Walk through
-        // matches and capture the text in between.
-        for (i, match) in matches.enumerated() {
-            let minutes = Double(nsBody.substring(with: match.range(at: 1))) ?? 0
-            let seconds = Double(nsBody.substring(with: match.range(at: 2))) ?? 0
-            var fraction: Double = 0
-            if match.numberOfRanges > 3, match.range(at: 3).location != NSNotFound {
-                let raw = nsBody.substring(with: match.range(at: 3))
-                let padded = raw.padding(toLength: 3, withPad: "0", startingAt: 0)
-                fraction = (Double(padded) ?? 0) / 1000.0
+        
+        if body.contains("<") {
+            if let firstMatch = matches.first {
+                let firstTagIdx = firstMatch.range.location
+                if firstTagIdx > 0 {
+                    let prefix = nsBody.substring(with: NSRange(location: 0, length: firstTagIdx)).trimmingCharacters(in: .whitespaces)
+                    if !prefix.isEmpty {
+                        let cleanPrefix = prefix.replacingOccurrences(of: "\\(\\s*\\)", with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+                        if !cleanPrefix.isEmpty {
+                            words.append(LyricsWord(time: firstLineTimestampWithoutOffset, text: cleanPrefix))
+                        }
+                    }
+                }
             }
-            let time = minutes * 60 + seconds + fraction
 
-            let textStart = match.range.location + match.range.length
-            let textEnd = i + 1 < matches.count ? matches[i + 1].range.location : nsBody.length
-            let text = nsBody.substring(with: NSRange(location: textStart, length: max(0, textEnd - textStart)))
-                .trimmingCharacters(in: .whitespaces)
-            if !text.isEmpty {
-                words.append(LyricsWord(time: time, text: text))
+            for (i, match) in matches.enumerated() {
+                let minutes = Double(nsBody.substring(with: match.range(at: 1))) ?? 0
+                let seconds = Double(nsBody.substring(with: match.range(at: 2))) ?? 0
+                var fraction: Double = 0
+                if match.numberOfRanges > 3, match.range(at: 3).location != NSNotFound {
+                    let raw = nsBody.substring(with: match.range(at: 3))
+                    let padded = raw.padding(toLength: 3, withPad: "0", startingAt: 0)
+                    fraction = (Double(padded) ?? 0) / 1000.0
+                }
+                let time = minutes * 60 + seconds + fraction
+
+                let textStart = match.range.location + match.range.length
+                let textEnd = i + 1 < matches.count ? matches[i + 1].range.location : nsBody.length
+                let text = nsBody.substring(with: NSRange(location: textStart, length: max(0, textEnd - textStart)))
+                    .trimmingCharacters(in: .whitespaces)
+                let cleanWText = text.replacingOccurrences(of: "\\(\\s*\\)", with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+                if !cleanWText.isEmpty {
+                    words.append(LyricsWord(time: time, text: cleanWText))
+                }
             }
         }
+        
         // Strip <…> markers from the clean version of the text.
         cleanText = regex.stringByReplacingMatches(
             in: body,
@@ -150,20 +175,57 @@ enum LyricsParser {
     }
 
     /// When the LRC source has only line-level timing, distribute words
-    /// across the line's duration proportionally to their character lengths.
-    /// This gives a believable highlight even without true word timing.
+    /// across the line's duration proportionally using the website's weighted algorithm.
     private static func synthesizeWords(text: String, start: Double, end: Double) -> [LyricsWord]? {
-        let tokens = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-        guard tokens.count > 1 else { return nil }
-        let lineDuration = max(0.5, end - start)
-        let totalChars = max(1, tokens.reduce(0) { $0 + $1.count })
-        var cursor = start
-        var words: [LyricsWord] = []
-        for token in tokens {
-            words.append(LyricsWord(time: cursor, text: token))
-            let share = Double(token.count) / Double(totalChars)
-            cursor += lineDuration * share
+        let rawWords = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        if rawWords.isEmpty { return nil }
+
+        // Compute weights
+        let weights = rawWords.map { w -> Double in
+            let lettersCount = w.folding(options: .diacriticInsensitive, locale: nil)
+                .filter { ("a"..."z").contains($0) || ("A"..."Z").contains($0) || ("а"..."я").contains($0) || ("А"..."Я").contains($0) || $0 == "ё" || $0 == "Ё" }
+                .count
+            let letters = Double(lettersCount > 0 ? lettersCount : 1)
+            var weight = sqrt(letters)
+            
+            if let lastChar = w.last {
+                let lastStr = String(lastChar)
+                if lastStr == "." || lastStr == "!" || lastStr == "?" || lastStr == "…" {
+                    weight += 0.6
+                } else if lastStr == "," || lastStr == ";" || lastStr == ":" || lastStr == "—" || lastStr == "–" || lastStr == "-" {
+                    weight += 0.3
+                }
+            }
+            return weight
         }
-        return words
-    }
+
+        let totalWeight = weights.reduce(0.0, +)
+        let gap = end - start
+        
+        let baseSingingDur = Double(rawWords.count) * 0.45
+        let singingGap = min(
+            gap * 0.75,
+            max(gap * 0.4, baseSingingDur)
+        )
+
+        let durPerUnitWeight = totalWeight > 0 ? (singingGap / totalWeight) : 0.0
+
+        var synthesizedWords: [LyricsWord] = []
+        var currentStartTime = start
+
+        for wIdx in 0..<rawWords.count {
+            let wText = rawWords[wIdx]
+            let baseDur = weights[wIdx] * durPerUnitWeight
+            
+            // Deterministic jitter from word position (avoids hydration/re-render mismatch)
+            let timeMs = Int(start.isFinite ? (start * 1000.0) : 0.0)
+            let seed = abs((wIdx * 131 + timeMs) % 1000)
+            let jitter = 1.0 + (((Double(seed) / 1000.0) * 0.3) - 0.15)
+            let finalDur = baseDur * jitter
+
+            synthesizedWords.append(LyricsWord(time: currentStartTime, text: wText))
+            currentStartTime += finalDur
+        }
+
+        return synthesizedWords
 }

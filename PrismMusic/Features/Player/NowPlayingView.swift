@@ -48,6 +48,7 @@ struct NowPlayingView: View {
                                 lyrics: app.audio.lyrics,
                                 progress: app.audio.progress,
                                 duration: app.audio.duration,
+                                isPlaying: app.audio.isPlaying,
                                 onSeek: { app.audio.seek(to: $0) }
                             )
                             .frame(width: coverSize)

@@ -19,7 +19,10 @@ struct SyncedLyricsView: View {
     /// between updates for sub-second accuracy.
     let progress: Double
     let duration: Double
+    let isPlaying: Bool
     let onSeek: (Double) -> Void
+
+    @StateObject private var ticker = LyricsTicker()
 
     var body: some View {
         Group {
@@ -31,6 +34,12 @@ struct SyncedLyricsView: View {
                 placeholder(symbol: "music.mic", text: "Нет текста для этого трека")
             }
         }
+        .onAppear {
+            ticker.update(progress: progress)
+        }
+        .onChange(of: progress) { _, newProgress in
+            ticker.update(progress: newProgress)
+        }
     }
 
     // MARK: - Content
@@ -41,8 +50,8 @@ struct SyncedLyricsView: View {
             // TimelineView drives per-frame redraws while playing; pulls
             // the wall-clock and lets us interpolate progress between
             // ~250ms ticks for smooth word advancement.
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: false)) { timeline in
-                let interpolated = interpolatedProgress(at: timeline.date)
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isPlaying)) { timeline in
+                let interpolated = ticker.interpolated(at: timeline.date, isPlaying: isPlaying)
                 let activeIndex = activeLineIndex(in: lines, at: interpolated, isSynced: isSynced)
 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -74,7 +83,6 @@ struct SyncedLyricsView: View {
                 }
             }
         }
-        .prismGlass(cornerRadius: Theme.Layout.cornerLarge)
         // Top + bottom fade so lines don't pop in/out at the edges.
         .mask(
             LinearGradient(
@@ -100,7 +108,6 @@ struct SyncedLyricsView: View {
                 .foregroundStyle(Theme.Palette.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .prismGlass(cornerRadius: Theme.Layout.cornerLarge)
     }
 
     // MARK: - Active line detection
@@ -120,16 +127,35 @@ struct SyncedLyricsView: View {
         }
         return best
     }
+}
 
-    /// Smooth-interpolate progress between AudioPlayer ticks. Without this
-    /// the word-by-word highlight visibly jitters every 250ms.
-    private func interpolatedProgress(at date: Date) -> Double {
-        // We can't read the player's last-tick timestamp from here, so we
-        // simply forward the captured `progress` value. With minimumInterval
-        // of 1/30s, the SwiftUI runtime keeps re-rendering and our parent
-        // observable updates do the rest. Adequate for visual fidelity —
-        // the 0.1s grace in `activeLineIndex` masks any lingering jitter.
-        progress
+// MARK: - Lyrics progress ticker for frame-rate interpolation
+
+@MainActor
+private final class LyricsTicker: ObservableObject {
+    private var lastProgress: Double = 0
+    private var lastUpdate: Date = Date()
+    private var rate: Double = 1.0
+
+    func update(progress: Double) {
+        let now = Date()
+        let elapsed = now.timeIntervalSince(lastUpdate)
+        let delta = progress - lastProgress
+        if elapsed > 0.05 && delta > 0 && delta < 2 {
+            let observed = delta / elapsed
+            if observed >= 0.5 && observed <= 2.0 {
+                rate = rate * 0.7 + observed * 0.3
+            }
+        }
+        lastProgress = progress
+        lastUpdate = now
+    }
+
+    func interpolated(at date: Date, isPlaying: Bool) -> Double {
+        guard isPlaying else { return lastProgress }
+        let elapsed = date.timeIntervalSince(lastUpdate)
+        if elapsed > 0.35 { return lastProgress }
+        return lastProgress + elapsed * rate
     }
 }
 
@@ -143,55 +169,69 @@ private struct LineView: View {
 
     var body: some View {
         Group {
-            if isActive, let words = line.words, !words.isEmpty {
+            if let words = line.words, !words.isEmpty {
                 karaokeText(words: words)
             } else {
                 Text(line.text)
+                    .foregroundStyle(lineOnlyTextColor)
+                    .shadow(color: isActive ? .white.opacity(0.3) : .clear, radius: 10, x: 0, y: 0)
             }
         }
-        .font(.system(size: isActive ? 24 : 20, weight: isActive ? .bold : .semibold, design: .rounded))
-        .foregroundStyle(textColor)
-        .opacity(opacity)
+        .font(.system(size: 24, weight: .bold, design: .rounded))
         .blur(radius: blurRadius)
-        .scaleEffect(isActive ? 1.02 : 1.0, anchor: .leading)
+        .opacity(lineOpacity)
+        .shadow(color: isActive ? .white.opacity(0.15) : .clear, radius: 8, x: 0, y: 0)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(Theme.Motion.apple, value: isActive)
     }
 
     /// Word-by-word text with an active/inactive split based on `progress`.
-    /// We use one Text concatenation: passed words highlight white, future
-    /// words dim, the currently-being-spoken word receives a subtle glow.
     private func karaokeText(words: [LyricsWord]) -> some View {
         var attributed = AttributedString()
         for (i, word) in words.enumerated() {
-            let next = i + 1 < words.count ? words[i + 1].time : (line.endTime ?? word.time + 0.6)
-            let state = wordState(start: word.time, end: next)
+            let next = i + 1 < words.count ? words[i + 1].time : (line.endTime ?? word.time + 1.0)
+            let color = wordColor(start: word.time, end: next)
             let text = word.text + (i == words.count - 1 ? "" : " ")
             var chunk = AttributedString(text)
-            chunk.foregroundColor = state.color
+            chunk.foregroundColor = color
             attributed.append(chunk)
         }
         return Text(attributed)
     }
 
-    private func wordState(start: Double, end: Double) -> (color: Color, glow: Bool) {
-        if progress >= end { return (Color.white, false) }
-        if progress >= start { return (Color.white, true) }    // currently-being-sung
-        return (Color.white.opacity(0.32), false)
+    private func wordColor(start: Double, end: Double) -> Color {
+        if isPast {
+            return Color.white.opacity(0.35)
+        }
+        if isActive {
+            if progress < start {
+                return Color.white.opacity(0.20)
+            } else if progress < end {
+                let elapsed = progress - start
+                let ratio = min(1.0, max(0.0, elapsed / 0.38))
+                let opacity = 0.20 + (1.0 - 0.20) * ratio
+                return Color.white.opacity(opacity)
+            } else {
+                let elapsed = progress - end
+                let ratio = min(1.0, max(0.0, elapsed / 0.75))
+                let opacity = 1.0 - (1.0 - 0.55) * ratio
+                return Color.white.opacity(opacity)
+            }
+        }
+        return Color.white.opacity(0.20)
     }
 
     // MARK: - Visual style
 
-    private var textColor: Color {
+    private var lineOnlyTextColor: Color {
         if isActive { return .white }
         if isPast { return Color.white.opacity(0.35) }
-        return Color.white.opacity(0.55)
+        return Color.white.opacity(0.20)
     }
 
-    private var opacity: Double {
-        if isActive { return 1 }
-        if isPast { return 0.55 }
-        return 0.85
+    private var lineOpacity: Double {
+        if isActive { return 1.0 }
+        if isPast { return 0.65 }
+        return 1.0
     }
 
     /// Cinematic depth-of-field — far-away inactive lines blur slightly.
