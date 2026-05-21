@@ -5,7 +5,6 @@
 //  Liked tracks. Empty state when nothing is liked yet. Tapping a track
 //  starts playback with the entire library as the queue.
 //
-
 import SwiftUI
 
 struct LibraryView: View {
@@ -13,14 +12,18 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if app.library.likedTracks.isEmpty {
-                    emptyState
-                } else {
-                    list
+            ZStack {
+                ImmersiveBackground()
+                    .ignoresSafeArea()
+
+                Group {
+                    if app.library.likedTracks.isEmpty {
+                        emptyState
+                    } else {
+                        list
+                    }
                 }
             }
-            .clearHostingBackground()
             .navigationBarHidden(true)
         }
     }

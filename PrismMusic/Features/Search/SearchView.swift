@@ -16,16 +16,20 @@ struct SearchView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                searchField
+            ZStack {
+                ImmersiveBackground()
+                    .ignoresSafeArea()
 
-                Divider()
-                    .background(Color.white.opacity(0.06))
-                    .padding(.top, 4)
+                VStack(spacing: 0) {
+                    searchField
 
-                content
+                    Divider()
+                        .background(Color.white.opacity(0.06))
+                        .padding(.top, 4)
+
+                    content
+                }
             }
-            .clearHostingBackground()
             .navigationBarHidden(true)
         }
     }

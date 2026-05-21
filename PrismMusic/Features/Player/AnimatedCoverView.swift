@@ -55,14 +55,21 @@ struct AnimatedCoverView: View {
     private var artwork: some View {
         if let url = track?.artworkURL {
             AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty: Color.black.opacity(0.6)
-                case .success(let image):
-                    image.resizable().interpolation(.high).scaledToFill()
-                case .failure: fallback
-                @unknown default: fallback
+                ZStack {
+                    if let image = phase.image {
+                        image
+                            .resizable()
+                            .interpolation(.high)
+                            .scaledToFill()
+                            .transition(.opacity)
+                    } else {
+                        fallback
+                            .transition(.opacity)
+                    }
                 }
+                .animation(.easeInOut(duration: 0.35), value: phase.image != nil)
             }
+            .id(url)
         } else {
             fallback
         }

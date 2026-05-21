@@ -48,11 +48,9 @@ struct Provider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping @Sendable (Timeline<Entry>) -> ()) {
-        Task {
-            let entry = await fetchCurrentEntryAsync()
-            let timeline = Timeline(entries: [entry], policy: .atEnd)
-            completion(timeline)
-        }
+        let entry = fetchCurrentEntrySync()
+        let timeline = Timeline(entries: [entry], policy: .atEnd)
+        completion(timeline)
     }
     
     private func readCurrentEntry() -> MusicWidgetEntry {
@@ -76,7 +74,7 @@ struct Provider: TimelineProvider {
         )
     }
     
-    private func fetchCurrentEntryAsync() async -> MusicWidgetEntry {
+    private func fetchCurrentEntrySync() -> MusicWidgetEntry {
         let defaults = UserDefaults(suiteName: "group.com.prism.music")
         let title = defaults?.string(forKey: "widget.track.title") ?? "Не воспроизводится"
         let artist = defaults?.string(forKey: "widget.track.artist") ?? ""
@@ -88,12 +86,19 @@ struct Provider: TimelineProvider {
         
         var artworkImage: UIImage? = nil
         if let artworkURL = artworkURL, !artworkURL.isEmpty, let url = URL(string: artworkURL) {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                artworkImage = UIImage(data: data)
-            } catch {
-                print("[Widget] Failed to fetch artwork: \(error.localizedDescription)")
+            let semaphore = DispatchSemaphore(value: 0)
+            let session = URLSession.shared
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 2.0 // Short timeout to avoid blocking widget extension process
+            
+            let task = session.dataTask(with: request) { data, response, error in
+                if let data = data {
+                    artworkImage = UIImage(data: data)
+                }
+                semaphore.signal()
             }
+            task.resume()
+            _ = semaphore.wait(timeout: .now() + 2.0)
         }
         
         return MusicWidgetEntry(

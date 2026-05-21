@@ -16,27 +16,31 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Hero banner
-                    heroBanner
+            ZStack {
+                ImmersiveBackground()
+                    .ignoresSafeArea()
 
-                    // Content
-                    switch app.recommendations.state {
-                    case .idle, .loading:
-                        loadingState
-                    case .failed(let message):
-                        errorState(message)
-                    case .loaded:
-                        albumGrid
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Hero banner
+                        heroBanner
+
+                        // Content
+                        switch app.recommendations.state {
+                        case .idle, .loading:
+                            loadingState
+                        case .failed(let message):
+                            errorState(message)
+                        case .loaded:
+                            albumGrid
+                        }
                     }
+                    .padding(.bottom, 140) // mini-player + tab bar room
                 }
-                .padding(.bottom, 140) // mini-player + tab bar room
-            }
-            .scrollIndicators(.hidden)
-            .clearHostingBackground()
-            .refreshable {
-                await app.recommendations.refresh(client: app.api)
+                .scrollIndicators(.hidden)
+                .refreshable {
+                    await app.recommendations.refresh(client: app.api)
+                }
             }
             .navigationBarHidden(true)
             .navigationDestination(for: Album.self) { album in

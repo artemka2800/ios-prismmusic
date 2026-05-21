@@ -22,109 +22,113 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("https://prism.example.com", text: $backendDraft)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        .autocorrectionDisabled()
-                        .foregroundStyle(.white)
-                        .tint(.white)
-                } header: {
-                    Text("Сервер PrismMusic")
-                } footer: {
-                    Text("URL Next.js-бэкенда. Должен быть доступен с устройства. Для локальной разработки используй IP-адрес твоего Mac в LAN, не localhost.")
-                }
+            ZStack {
+                ImmersiveBackground()
+                    .ignoresSafeArea()
 
-                Section {
-                    SecureField("Введи Yandex.Music token", text: $tokenDraft)
-                        .foregroundStyle(.white)
-                        .tint(.white)
-
-                    Button {
-                        showTokenInfo = true
-                    } label: {
-                        Label("Как получить токен?", systemImage: "questionmark.circle")
+                Form {
+                    Section {
+                        TextField("https://prism.example.com", text: $backendDraft)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                            .autocorrectionDisabled()
                             .foregroundStyle(.white)
+                            .tint(.white)
+                    } header: {
+                        Text("Сервер PrismMusic")
+                    } footer: {
+                        Text("URL Next.js-бэкенда. Должен быть доступен с устройства. Для локальной разработки используй IP-адрес твоего Mac в LAN, не localhost.")
                     }
 
-                    if !app.settings.yandexToken.isEmpty {
+                    Section {
+                        SecureField("Введи Yandex.Music token", text: $tokenDraft)
+                            .foregroundStyle(.white)
+                            .tint(.white)
+
                         Button {
-                            importYandexLikes()
+                            showTokenInfo = true
                         } label: {
-                            HStack {
-                                Label("Импортировать любимые треки", systemImage: "arrow.down.circle")
-                                    .foregroundStyle(.white)
-                                Spacer()
-                                if isImporting {
-                                    ProgressView()
-                                        .tint(.white)
+                            Label("Как получить токен?", systemImage: "questionmark.circle")
+                                .foregroundStyle(.white)
+                        }
+
+                        if !app.settings.yandexToken.isEmpty {
+                            Button {
+                                importYandexLikes()
+                            } label: {
+                                HStack {
+                                    Label("Импортировать любимые треки", systemImage: "arrow.down.circle")
+                                        .foregroundStyle(.white)
+                                    Spacer()
+                                    if isImporting {
+                                        ProgressView()
+                                            .tint(.white)
+                                    }
                                 }
                             }
+                            .disabled(isImporting)
                         }
-                        .disabled(isImporting)
+                    } header: {
+                        Text("Yandex.Music")
+                    } footer: {
+                        Text("Без токена доступен только SoundCloud. Токен хранится в Keychain устройства, бэкенд получает его одноразово в каждом запросе стрима.")
                     }
-                } header: {
-                    Text("Yandex.Music")
-                } footer: {
-                    Text("Без токена доступен только SoundCloud. Токен хранится в Keychain устройства, бэкенд получает его одноразово в каждом запросе стрима.")
-                }
 
-                Section {
-                    Toggle(isOn: Binding(
-                        get: { app.settings.immersiveMode },
-                        set: { app.settings.immersiveMode = $0 }
-                    )) {
-                        Label("Immersive фон", systemImage: "sparkles")
-                            .foregroundStyle(.white)
+                    Section {
+                        Toggle(isOn: Binding(
+                            get: { app.settings.immersiveMode },
+                            set: { app.settings.immersiveMode = $0 }
+                        )) {
+                            Label("Immersive фон", systemImage: "sparkles")
+                                .foregroundStyle(.white)
+                        }
+                        .tint(.white)
+                    } header: {
+                        Text("Внешний вид")
+                    } footer: {
+                        Text("Immersive фон подкрашивает фон приложения цветом текущей обложки.")
                     }
-                    .tint(.white)
-                } header: {
-                    Text("Внешний вид")
-                } footer: {
-                    Text("Immersive фон подкрашивает фон приложения цветом текущей обложки.")
-                }
 
-                Section {
-                    Button {
-                        logsContent = DebugLogger.shared.readLogs()
-                        showDebugLogs = true
-                    } label: {
-                        Label("Посмотреть логи (Debug)", systemImage: "ladybug")
-                            .foregroundStyle(.white)
+                    Section {
+                        Button {
+                            logsContent = DebugLogger.shared.readLogs()
+                            showDebugLogs = true
+                        } label: {
+                            Label("Посмотреть логи (Debug)", systemImage: "ladybug")
+                                .foregroundStyle(.white)
+                        }
+                        Button {
+                            DebugLogger.shared.clearLogs()
+                        } label: {
+                            Label("Очистить логи", systemImage: "trash")
+                                .foregroundStyle(.red)
+                        }
+                    } header: {
+                        Text("Отладка")
                     }
-                    Button {
-                        DebugLogger.shared.clearLogs()
-                    } label: {
-                        Label("Очистить логи", systemImage: "trash")
-                            .foregroundStyle(.red)
-                    }
-                } header: {
-                    Text("Отладка")
-                }
 
-                Section {
-                    Button {
-                        save()
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if savedFlash {
-                                Label("Сохранено", systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                            } else {
-                                Text("Сохранить")
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.white)
+                    Section {
+                        Button {
+                            save()
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if savedFlash {
+                                    Label("Сохранено", systemImage: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                } else {
+                                    Text("Сохранить")
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.white)
+                                }
+                                Spacer()
                             }
-                            Spacer()
                         }
+                        .disabled(savedFlash)
                     }
-                    .disabled(savedFlash)
                 }
+                .scrollContentBackground(.hidden)
             }
-            .scrollContentBackground(.hidden)
-            .clearHostingBackground()
             .navigationTitle("Настройки")
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaPadding(.bottom, app.audio.currentTrack != nil ? 100 : 0)

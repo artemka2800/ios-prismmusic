@@ -46,6 +46,8 @@ final class AudioPlayer {
     private var lastWidgetTrackId: String? = nil
     private var lastWidgetIsPlaying: Bool? = nil
     private var lastWidgetLyricsLines: [String]? = nil
+    private var lastWidgetLyricLineIndex: Int? = nil
+    private var hasTriggeredAutoNext: Bool = false
 
     var errorMessage: String? = nil
     var showError: Bool = false
@@ -225,6 +227,8 @@ final class AudioPlayer {
         duration = track.durationSeconds ?? 0
         isBuffering = true
         lyrics = nil
+        lastWidgetLyricLineIndex = nil
+        hasTriggeredAutoNext = false
 
         // Update widget metadata immediately
         updateWidgetState(force: true)
@@ -352,6 +356,14 @@ final class AudioPlayer {
 
     // MARK: - Time observation
 
+    private var hasNextTrack: Bool {
+        guard !queue.isEmpty else { return false }
+        if isShuffled { return true }
+        if currentIndex + 1 < queue.count { return true }
+        if repeatMode == .all { return true }
+        return false
+    }
+
     private func attachTimeObserver() {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         // Tick every 250ms — enough granularity for the lyrics RAF
@@ -364,7 +376,21 @@ final class AudioPlayer {
                 guard seconds.isFinite else { return }
                 self.progress = seconds
                 
-                self.updateWidgetState()
+                // Trigger early transition for audio crossfade if there's a next track
+                let remaining = self.duration - seconds
+                if remaining > 0 && remaining <= 3.0 && !self.hasTriggeredAutoNext && self.repeatMode != .one && self.hasNextTrack && self.duration > 10 {
+                    self.hasTriggeredAutoNext = true
+                    self.next()
+                }
+                
+                // Only trigger widget updates in the time observer if the active lyric line changes
+                if let lyrics = self.lyrics, lyrics.isSynced {
+                    let activeIndex = lyrics.lines.lastIndex(where: { $0.time <= seconds }) ?? -1
+                    if activeIndex != self.lastWidgetLyricLineIndex {
+                        self.lastWidgetLyricLineIndex = activeIndex
+                        self.updateWidgetState()
+                    }
+                }
                 
                 // Refresh Now Playing occasionally
                 if Int(seconds * 4) % 4 == 0 {
