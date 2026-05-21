@@ -3,8 +3,8 @@
 //  PrismMusic
 //
 //  Core music models, mirroring the TS types in the web app
-//  (`components/music/album-card.tsx`). `Codable` for direct JSON
-//  decoding from the backend.
+//  (`components/music/album-card.tsx`). Custom Decodable to handle
+//  backend field variations (e.g. `cover` vs `coverUrl`).
 //
 
 import Foundation
@@ -36,9 +36,68 @@ struct Track: Identifiable, Hashable, Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, title, artist, album
         case durationSeconds = "duration"
-        case cover
+        case cover, coverUrl
         case streamURL = "url"
+        case audioUrl
         case source
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.artist = try container.decode(String.self, forKey: .artist)
+        self.album = try? container.decode(String.self, forKey: .album)
+        self.durationSeconds = try? container.decode(Double.self, forKey: .durationSeconds)
+        self.source = try? container.decode(TrackSource.self, forKey: .source)
+
+        // Cover: backend sends either `cover` (URL) or `coverUrl` (string)
+        if let coverURL = try? container.decode(URL.self, forKey: .cover) {
+            self.cover = coverURL
+        } else if let coverString = try? container.decode(String.self, forKey: .coverUrl) {
+            self.cover = URL(string: coverString)
+        } else if let coverString = try? container.decode(String.self, forKey: .cover) {
+            self.cover = URL(string: coverString)
+        } else {
+            self.cover = nil
+        }
+
+        // Stream URL: backend sends either `url` or `audioUrl`
+        if let url = try? container.decode(URL.self, forKey: .streamURL) {
+            self.streamURL = url
+        } else if let urlString = try? container.decode(String.self, forKey: .audioUrl) {
+            self.streamURL = URL(string: urlString)
+        } else if let urlString = try? container.decode(String.self, forKey: .streamURL) {
+            self.streamURL = URL(string: urlString)
+        } else {
+            self.streamURL = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(artist, forKey: .artist)
+        try container.encodeIfPresent(album, forKey: .album)
+        try container.encodeIfPresent(durationSeconds, forKey: .durationSeconds)
+        try container.encodeIfPresent(cover, forKey: .cover)
+        try container.encodeIfPresent(streamURL, forKey: .streamURL)
+        try container.encodeIfPresent(source, forKey: .source)
+    }
+
+    /// Manual init for programmatic construction (e.g. from API mapping).
+    init(id: String, title: String, artist: String, album: String? = nil,
+         durationSeconds: Double? = nil, cover: URL? = nil,
+         streamURL: URL? = nil, source: TrackSource? = nil) {
+        self.id = id
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.durationSeconds = durationSeconds
+        self.cover = cover
+        self.streamURL = streamURL
+        self.source = source
     }
 }
 

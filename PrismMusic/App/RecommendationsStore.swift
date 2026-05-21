@@ -2,8 +2,9 @@
 //  RecommendationsStore.swift
 //  PrismMusic
 //
-//  Fetches and caches the home-screen recommendations. Loaded once at
-//  app start and refreshable by pull-to-refresh in `HomeView`.
+//  Fetches and caches the home-screen recommendations (playlists from
+//  SoundCloud, mapped to Albums). Loaded once at app start and refreshable
+//  by pull-to-refresh in `HomeView`.
 //
 
 import Foundation
@@ -20,12 +21,11 @@ final class RecommendationsStore {
     }
 
     private(set) var state: State = .idle
-    private(set) var tracks: [Track] = []
     private(set) var albums: [Album] = []
 
     /// Fires a fetch only if we don't already have data — idempotent.
     func loadIfNeeded(client: APIClient) async {
-        if case .loaded = state, !tracks.isEmpty { return }
+        if case .loaded = state, !albums.isEmpty { return }
         await refresh(client: client)
     }
 
@@ -33,8 +33,7 @@ final class RecommendationsStore {
         state = .loading
         do {
             let response = try await client.recommendations()
-            tracks = response.tracks
-            albums = response.albums ?? []
+            albums = response.albums
             state = .loaded
         } catch {
             state = .failed(error.localizedDescription)
