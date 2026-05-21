@@ -51,14 +51,21 @@ final class LibraryStore {
         var addedCount = 0
         for track in tracks {
             if !likedTrackIDs.contains(track.id) {
-                likedTrackIDs.insert(track.id)
-                likedTracks.insert(track, at: 0)
                 addedCount += 1
             }
         }
-        if addedCount > 0 {
-            persist()
+        
+        // Remove existing yandex tracks so we can insert them in the correct order
+        likedTracks.removeAll { $0.source == .yandex }
+        likedTrackIDs = Set(likedTracks.map { $0.id })
+        
+        // Prepend imported tracks in reverse order so the newest from Yandex is at index 0 (top)
+        for track in tracks.reversed() {
+            likedTrackIDs.insert(track.id)
+            likedTracks.insert(track, at: 0)
         }
+        
+        persist()
         return addedCount
     }
 
