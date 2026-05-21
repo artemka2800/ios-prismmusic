@@ -149,13 +149,13 @@ jobs:
           echo "  Cleaned extended attributes and .DS_Store"
 
           # ── Step 2: Strip code signatures ──────────────────────────
-          # AltStore re-signs everything from scratch. Pre-existing
-          # signatures (especially ad-hoc ones) can confuse it.
+          # AltStore/Sideloadly re-sign everything. We remove old provisioning
+          # profiles, but keep the _CodeSignature folder structure so that the resigning
+          # engines recognize all embedded bundles (like the widget extension) as signable targets.
           echo ""
-          echo "=== Stripping code signatures ==="
-          find build/ipa-staging/Payload -name "_CodeSignature" -type d -exec rm -rf {} + 2>/dev/null || true
+          echo "=== Cleaning provisioning profiles ==="
           find build/ipa-staging/Payload -name "*.mobileprovision" -delete 2>/dev/null || true
-          echo "  Stripped _CodeSignature and .mobileprovision"
+          echo "  Cleaned .mobileprovision files"
 
           # ── Step 3: Convert ALL binary plists to XML1 ──────────────
           # NSCocoaErrorDomain 3840 = plist parse error. AltServer's
@@ -210,6 +210,14 @@ jobs:
           unzip -l PrismMusic-unsigned.ipa | grep -q "Payload/PrismMusic.app/PrismMusic$" \
             && echo "✅ Main binary present" \
             || { echo "❌ Missing main binary"; exit 1; }
+
+          unzip -l PrismMusic-unsigned.ipa | grep -q "Payload/PrismMusic.app/PlugIns/PrismMusicWidget.appex/" \
+            && echo "✅ Widget extension present" \
+            || { echo "❌ Missing Widget extension (PrismMusicWidget.appex)"; exit 1; }
+
+          unzip -l PrismMusic-unsigned.ipa | grep -q "Payload/PrismMusic.app/PlugIns/PrismMusicWidget.appex/Info.plist" \
+            && echo "✅ Widget Info.plist present" \
+            || { echo "❌ Missing Widget Info.plist"; exit 1; }
 
           echo ""
           echo "=== Binary architecture ==="

@@ -367,14 +367,22 @@ extension UserDefaults {
     static var appGroup: UserDefaults? {
         let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
         var components = bundleId.components(separatedBy: ".")
-        if components.last == "widget" {
+        
+        let suffixesToStrip: Set<String> = [
+            "widget",
+            "prismmusicwidget",
+            "prismmusicwidgetextension",
+            "extension",
+            "app"
+        ]
+        
+        while let lastComponent = components.last?.lowercased(), suffixesToStrip.contains(lastComponent) {
             components.removeLast()
         }
-        if components.last == "app" {
-            components.removeLast()
-        }
+        
         let appGroupId = "group." + components.joined(separator: ".")
         return UserDefaults(suiteName: appGroupId)
     }
 }
+
 
