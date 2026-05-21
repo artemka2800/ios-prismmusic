@@ -26,6 +26,7 @@ struct NowPlayingView: View {
     @State private var sleepTask: Task<Void, Never>? = nil
 
     private func setSleepTimer(_ minutes: Int?) {
+        resetIdleTimer()
         sleepMinutes = minutes
         startSleepTimer()
     }
@@ -150,51 +151,51 @@ struct NowPlayingView: View {
 
                 Spacer(minLength: 12)
 
-                GeometryReader { proxy in
-                    let coverSize = min(proxy.size.width, proxy.size.height) * 0.85
-                    ZStack {
-                        if panel == .lyrics {
-                            SyncedLyricsView(
-                                lyrics: app.audio.lyrics,
-                                progress: app.audio.progress,
-                                duration: app.audio.duration,
-                                isPlaying: app.audio.isPlaying,
-                                onSeek: { app.audio.seek(to: $0) },
-                                onInteraction: {
-                                    resetIdleTimer()
-                                }
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                handleBackgroundTap()
+                ZStack {
+                    if panel == .lyrics {
+                        SyncedLyricsView(
+                            lyrics: app.audio.lyrics,
+                            progress: app.audio.progress,
+                            duration: app.audio.duration,
+                            isPlaying: app.audio.isPlaying,
+                            onSeek: { app.audio.seek(to: $0) },
+                            onInteraction: {
+                                resetIdleTimer()
                             }
-                            .transition(.opacity)
-                        } else if panel == .queue {
-                            QueueView(
-                                queue: app.audio.queue,
-                                currentIndex: app.audio.currentIndex,
-                                isPlaying: app.audio.isPlaying,
-                                onSelectTrack: { index in
-                                    app.audio.play(queue: app.audio.queue, startAt: index)
-                                }
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .transition(.opacity)
-                        } else {
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            handleBackgroundTap()
+                        }
+                        .transition(.opacity)
+                    } else if panel == .queue {
+                        QueueView(
+                            queue: app.audio.queue,
+                            currentIndex: app.audio.currentIndex,
+                            isPlaying: app.audio.isPlaying,
+                            onSelectTrack: { index in
+                                app.audio.play(queue: app.audio.queue, startAt: index)
+                            }
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity)
+                    } else {
+                        GeometryReader { proxy in
+                            let coverSize = min(proxy.size.width, proxy.size.height) * 0.85
                             AnimatedCoverView(
                                 track: app.audio.currentTrack,
                                 isPlaying: app.audio.isPlaying,
                                 size: coverSize
                             )
                             .id(app.audio.currentTrack?.id)   // forces motion reset on change
-                            .transition(.scale.combined(with: .opacity))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
+                        .transition(.scale.combined(with: .opacity))
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .animation(Theme.Motion.appleLong, value: panel)
                 }
                 .frame(maxHeight: .infinity)
+                .animation(Theme.Motion.appleLong, value: panel)
 
                 if showControls {
                     VStack(spacing: 0) {
@@ -243,6 +244,7 @@ struct NowPlayingView: View {
     private var topBar: some View {
         HStack {
             Button {
+                resetIdleTimer()
                 isPresented = false
             } label: {
                 Image(systemName: "chevron.down")
@@ -269,7 +271,9 @@ struct NowPlayingView: View {
 
             Spacer()
 
-            Button {} label: {
+            Button {
+                resetIdleTimer()
+            } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .semibold))
                     .frame(width: 38, height: 38)
@@ -313,7 +317,10 @@ struct NowPlayingView: View {
             ProgressSlider(
                 value: app.audio.progress,
                 duration: app.audio.duration,
-                onSeek: { app.audio.seek(to: $0) }
+                onSeek: {
+                    resetIdleTimer()
+                    app.audio.seek(to: $0)
+                }
             )
             HStack {
                 Text(formatTime(app.audio.progress))
@@ -338,7 +345,10 @@ struct NowPlayingView: View {
 
             iconButton("backward.fill", size: 28, action: app.audio.previous)
 
-            Button(action: app.audio.togglePlay) {
+            Button(action: {
+                resetIdleTimer()
+                app.audio.togglePlay()
+            }) {
                 Image(systemName: app.audio.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 28, weight: .bold))
                     .frame(width: 76, height: 76)
@@ -371,7 +381,10 @@ struct NowPlayingView: View {
     }
 
     private func iconButton(_ symbol: String, size: CGFloat = 22, tinted: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button(action: {
+            resetIdleTimer()
+            action()
+        }) {
             Image(systemName: symbol)
                 .font(.system(size: size, weight: .semibold))
                 .frame(width: 50, height: 50)
@@ -389,7 +402,10 @@ struct NowPlayingView: View {
 
             // Like
             let liked = app.audio.currentTrack.map(app.library.isLiked) ?? false
-            Button(action: app.audio.toggleLike) {
+            Button(action: {
+                resetIdleTimer()
+                app.audio.toggleLike()
+            }) {
                 Image(systemName: liked ? "heart.fill" : "heart")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
@@ -400,7 +416,10 @@ struct NowPlayingView: View {
             Spacer()
 
             // Lyrics (music.mic like website)
-            Button(action: { togglePanel(.lyrics) }) {
+            Button(action: {
+                resetIdleTimer()
+                togglePanel(.lyrics)
+            }) {
                 Image(systemName: "music.mic")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
@@ -411,7 +430,10 @@ struct NowPlayingView: View {
             Spacer()
 
             // Queue
-            Button(action: { togglePanel(.queue) }) {
+            Button(action: {
+                resetIdleTimer()
+                togglePanel(.queue)
+            }) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
@@ -449,11 +471,17 @@ struct NowPlayingView: View {
                     }
             }
             .menuStyle(.button)
+            .simultaneousGesture(TapGesture().onEnded {
+                resetIdleTimer()
+            })
 
             Spacer()
 
             // Share
-            Button(action: shareTrack) {
+            Button(action: {
+                resetIdleTimer()
+                shareTrack()
+            }) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
