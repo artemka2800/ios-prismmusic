@@ -59,10 +59,19 @@ struct SettingsView: View {
                             .foregroundStyle(.white)
                     }
                     .tint(.white)
+
+                    Toggle(isOn: Binding(
+                        get: { app.settings.animatedCover },
+                        set: { app.settings.animatedCover = $0 }
+                    )) {
+                        Label("Анимированная обложка", systemImage: "waveform")
+                            .foregroundStyle(.white)
+                    }
+                    .tint(.white)
                 } header: {
                     Text("Внешний вид")
                 } footer: {
-                    Text("Подкрашивает фон приложения цветом текущей обложки.")
+                    Text("Immersive фон подкрашивает фон приложения цветом текущей обложки. Анимированная обложка включает плавный дрейф, пульсацию подсветки и параллакс по гироскопу.")
                 }
 
                 Section {

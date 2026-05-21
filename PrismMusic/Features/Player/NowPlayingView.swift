@@ -11,6 +11,11 @@
 //   - secondary actions (like, lyrics, queue, volume, share, more)
 //   - lyrics panel that slides out from behind the cover when lyrics enabled
 //
+//  Track change animations:
+//   - Cover slides left/right based on direction (forward → left, backward → right)
+//   - Track info crossfades with a subtle upward slide
+//   - Backdrop smoothly transitions to the new cover's colour palette
+//
 
 import SwiftUI
 
@@ -101,14 +106,53 @@ struct NowPlayingView: View {
         }
     }
 
+    /// Custom transition for cover based on track change direction.
+    private var coverTransition: AnyTransition {
+        switch app.audio.trackChangeDirection {
+        case .forward:
+            return .asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity).combined(with: .scale(scale: 0.88)),
+                removal: .move(edge: .leading).combined(with: .opacity).combined(with: .scale(scale: 0.88))
+            )
+        case .backward:
+            return .asymmetric(
+                insertion: .move(edge: .leading).combined(with: .opacity).combined(with: .scale(scale: 0.88)),
+                removal: .move(edge: .trailing).combined(with: .opacity).combined(with: .scale(scale: 0.88))
+            )
+        case .none:
+            return .scale(scale: 0.92).combined(with: .opacity)
+        }
+    }
+
     var body: some View {
         ZStack {
-            // Cover-tinted backdrop fills the whole screen.
-            Backdrop()
-                .ignoresSafeArea()
-                .onTapGesture {
-                    handleBackgroundTap()
-                }
+            // Background layer — depends on animated cover setting
+            if app.settings.animatedCover {
+                // Full-screen animated cover (Apple Music lock screen style)
+                FullScreenAnimatedCover(
+                    track: app.audio.currentTrack,
+                    isPlaying: app.audio.isPlaying
+                )
+                .id(app.audio.currentTrack?.id)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.8), value: app.audio.currentTrack?.id)
+                .allowsHitTesting(false)
+            } else {
+                // Classic blurred backdrop
+                Backdrop()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+
+            // Transparent tap catcher for lyrics background tap — sits below controls
+            if panel == .lyrics {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        handleBackgroundTap()
+                    }
+                    .ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 if showControls {
@@ -180,22 +224,30 @@ struct NowPlayingView: View {
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
-                    } else {
+                    } else if !app.settings.animatedCover {
+                        // Show centered square cover only when NOT in full-screen mode
                         GeometryReader { proxy in
                             let coverSize = min(proxy.size.width, proxy.size.height) * 0.85
                             AnimatedCoverView(
                                 track: app.audio.currentTrack,
                                 isPlaying: app.audio.isPlaying,
-                                size: coverSize
+                                size: coverSize,
+                                animatedCoverEnabled: false
                             )
-                            .id(app.audio.currentTrack?.id)   // forces motion reset on change
+                            .id(app.audio.currentTrack?.id)
+                            .transition(coverTransition)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                         .transition(.scale.combined(with: .opacity))
+                    } else {
+                        // Full-screen mode: empty spacer where cover would be,
+                        // the full-screen image IS the background
+                        Spacer()
                     }
                 }
                 .frame(maxHeight: .infinity)
                 .animation(Theme.Motion.appleLong, value: panel)
+                .animation(.spring(response: 0.55, dampingFraction: 0.78), value: app.audio.currentTrack?.id)
 
                 if showControls {
                     VStack(spacing: 0) {
@@ -249,7 +301,8 @@ struct NowPlayingView: View {
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(GlassCircleButtonStyle())
 
@@ -276,7 +329,8 @@ struct NowPlayingView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(GlassCircleButtonStyle())
         }
@@ -305,8 +359,13 @@ struct NowPlayingView: View {
                 .lineLimit(1)
         }
         .id(app.audio.currentTrack?.id)
-        .transition(.opacity.combined(with: .move(edge: .bottom)))
-        .animation(Theme.Motion.apple, value: app.audio.currentTrack?.id)
+        .transition(
+            .asymmetric(
+                insertion: .opacity.combined(with: .move(edge: .bottom)).combined(with: .scale(scale: 0.96)),
+                removal: .opacity.combined(with: .move(edge: .top)).combined(with: .scale(scale: 0.96))
+            )
+        )
+        .animation(.spring(response: 0.5, dampingFraction: 0.82), value: app.audio.currentTrack?.id)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -358,6 +417,7 @@ struct NowPlayingView: View {
                             .fill(.white)
                             .shadow(color: .white.opacity(0.25), radius: 22)
                     )
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .scaleEffect(app.audio.isPlaying ? 1 : 0.94)
@@ -388,6 +448,7 @@ struct NowPlayingView: View {
             Image(systemName: symbol)
                 .font(.system(size: size, weight: .semibold))
                 .frame(width: 50, height: 50)
+                .contentShape(Rectangle())
                 .foregroundStyle(tinted ? Color.white : Theme.Palette.textSecondary)
         }
         .buttonStyle(.plain)
@@ -409,6 +470,7 @@ struct NowPlayingView: View {
                 Image(systemName: liked ? "heart.fill" : "heart")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                     .foregroundStyle(liked ? Color.white : Theme.Palette.textSecondary)
             }
             .buttonStyle(.plain)
@@ -423,6 +485,7 @@ struct NowPlayingView: View {
                 Image(systemName: "music.mic")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                     .foregroundStyle(panel == .lyrics ? Color.white : Theme.Palette.textSecondary)
             }
             .buttonStyle(.plain)
@@ -437,6 +500,7 @@ struct NowPlayingView: View {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                     .foregroundStyle(panel == .queue ? Color.white : Theme.Palette.textSecondary)
             }
             .buttonStyle(.plain)
@@ -457,6 +521,7 @@ struct NowPlayingView: View {
                 Image(systemName: sleepMinutes != nil ? "moon.zzz.fill" : "moon.zzz")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                     .foregroundStyle(sleepMinutes != nil ? Color.white : Theme.Palette.textSecondary)
                     .overlay(alignment: .topTrailing) {
                         if let sleepMinutes {
@@ -471,9 +536,6 @@ struct NowPlayingView: View {
                     }
             }
             .menuStyle(.button)
-            .simultaneousGesture(TapGesture().onEnded {
-                resetIdleTimer()
-            })
 
             Spacer()
 
@@ -485,6 +547,7 @@ struct NowPlayingView: View {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                     .foregroundStyle(Theme.Palette.textSecondary)
             }
             .buttonStyle(.plain)
@@ -529,6 +592,9 @@ private struct Backdrop: View {
                 }
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                 .clipped()
+                .id(app.audio.currentTrack?.id)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.8), value: app.audio.currentTrack?.id)
             }
 
             LinearGradient(

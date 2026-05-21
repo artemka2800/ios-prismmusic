@@ -42,6 +42,13 @@ final class SettingsStore {
         }
     }
 
+    /// Whether the animated cover (drift, breath, gyroscope parallax) is on.
+    var animatedCover: Bool {
+        didSet {
+            UserDefaults.standard.set(animatedCover, forKey: Keys.animatedCover)
+        }
+    }
+
     // MARK: - Init
 
     init() {
@@ -49,11 +56,13 @@ final class SettingsStore {
         self.backendURL = storedURL.isEmpty ? APIConfig.defaultBackendURL : storedURL
         self.yandexToken = KeychainStore.get(Keys.yandexToken) ?? ""
         self.immersiveMode = UserDefaults.standard.object(forKey: Keys.immersiveMode) as? Bool ?? true
+        self.animatedCover = UserDefaults.standard.object(forKey: Keys.animatedCover) as? Bool ?? true
     }
 
     private enum Keys {
         static let backendURL = "prism.backendURL"
         static let yandexToken = "prism.yandexToken"
         static let immersiveMode = "prism.immersive"
+        static let animatedCover = "prism.animatedCover"
     }
 }

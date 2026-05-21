@@ -27,6 +27,8 @@ import UIKit
 final class AudioPlayer {
     // MARK: - Observable state
 
+    enum TrackChangeDirection { case forward, backward, none }
+
     private(set) var currentTrack: Track?
     private(set) var queue: [Track] = []
     private(set) var currentIndex: Int = 0
@@ -34,6 +36,8 @@ final class AudioPlayer {
     private(set) var progress: Double = 0
     private(set) var duration: Double = 0
     private(set) var isBuffering: Bool = false
+    /// Direction of the last track change — used by the UI to animate cover slides.
+    private(set) var trackChangeDirection: TrackChangeDirection = .none
 
     var errorMessage: String? = nil
     var showError: Bool = false
@@ -97,6 +101,7 @@ final class AudioPlayer {
         let clampedIndex = max(0, min(index, tracks.count - 1))
         self.queue = tracks
         self.currentIndex = clampedIndex
+        self.trackChangeDirection = .none
         load(track: tracks[clampedIndex], autoplay: true)
     }
 
@@ -127,6 +132,7 @@ final class AudioPlayer {
         } else {
             nextIndex = currentIndex + 1
         }
+        trackChangeDirection = .forward
         currentIndex = nextIndex
         load(track: queue[nextIndex], autoplay: true)
     }
@@ -138,6 +144,7 @@ final class AudioPlayer {
             seek(to: 0)
             return
         }
+        trackChangeDirection = .backward
         let prevIndex = currentIndex == 0 ? queue.count - 1 : currentIndex - 1
         currentIndex = prevIndex
         load(track: queue[prevIndex], autoplay: true)
