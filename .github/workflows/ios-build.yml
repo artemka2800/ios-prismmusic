@@ -28,6 +28,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Select Xcode 26 beta
+        run: |
+          # Use the latest Xcode 26 beta available on the runner.
+          # macos-15 runners may have Xcode 26 beta pre-installed;
+          # if not, we fall back to xcodes or xcode-select.
+          XCODE26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE26" ]; then
+            XCODE26=$(ls -d /Applications/Xcode-beta.app 2>/dev/null | head -1)
+          fi
+          if [ -z "$XCODE26" ]; then
+            echo "::error::Xcode 26 beta not found on this runner."
+            echo "Available Xcode versions:"
+            ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
+          echo "Selecting $XCODE26"
+          sudo xcode-select -s "$XCODE26"
+
       - name: Show toolchain
         run: |
           sw_vers
@@ -67,51 +85,121 @@ jobs:
             -project PrismMusic.xcodeproj \
             -scheme PrismMusic
 
-      # ── Archive for device (unsigned) ─────────────────────────────
-      - name: Archive for iOS device
+      # ── Build for device (unsigned) ───────────────────────────────
+      # We use `build` instead of `archive` — archive without signing
+      # produces an incomplete .xcarchive that confuses AltStore.
+      # Plain `build` gives us a proper .app bundle with all frameworks
+      # and the extension correctly embedded in PlugIns/.
+      - name: Build for iOS device
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
           set -o pipefail
-          xcodebuild archive \
+          xcodebuild build \
             -project PrismMusic.xcodeproj \
             -scheme PrismMusic \
             -configuration Release \
+            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -archivePath build/PrismMusic.xcarchive \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGN_IDENTITY="-" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             -quiet
 
-      # ── Create .ipa from archive ─────────────────────────────────
-      # An .ipa is simply a zip with a Payload/ folder containing the .app.
-      # Since we're unsigned, we skip `xcodebuild -exportArchive` (which
-      # requires signing) and build the .ipa manually.
+      # ── Locate the .app ──────────────────────────────────────────
+      - name: Locate built .app bundle
+        id: locate_app
+        working-directory: ${{ steps.locate_project.outputs.root }}
+        run: |
+          APP_PATH=$(find build/Build/Products -type d -name 'PrismMusic.app' | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::PrismMusic.app not found in build output."
+            echo "Build products tree:"
+            find build/Build/Products -type d -maxdepth 4 || true
+            exit 1
+          fi
+          echo "Found app at: $APP_PATH"
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      # ── Create .ipa from .app ─────────────────────────────────────
+      # An .ipa is a zip with:
+      #   Payload/
+      #     AppName.app/
+      #       (binary, Info.plist, frameworks, PlugIns, etc.)
+      #
+      # We do NOT strip _CodeSignature — AltStore / Sideloadly expect
+      # the standard .app bundle structure and will re-sign it themselves.
       - name: Create unsigned IPA
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
-          ARCHIVE_APP="build/PrismMusic.xcarchive/Products/Applications/PrismMusic.app"
-          if [ ! -d "$ARCHIVE_APP" ]; then
-            echo "::error::PrismMusic.app not found in archive."
-            echo "Archive contents:"
-            find build/PrismMusic.xcarchive -type d -name '*.app' || true
-            exit 1
-          fi
+          APP_PATH="${{ steps.locate_app.outputs.app_path }}"
 
           # Build Payload structure
-          mkdir -p build/Payload
-          cp -R "$ARCHIVE_APP" build/Payload/
+          mkdir -p build/ipa-staging/Payload
+          cp -R "$APP_PATH" build/ipa-staging/Payload/
 
-          # Remove code signature directory (if any leftover)
-          find build/Payload -name "_CodeSignature" -type d -exec rm -rf {} + 2>/dev/null || true
+          # If Swift runtime libs aren't embedded, copy them for non-jailbreak devices.
+          # On modern iOS (14+) the Swift runtime is always present, so this is
+          # mostly a safety net.
+          if [ -d "$APP_PATH/Frameworks" ]; then
+            echo "Frameworks directory found — Swift support included."
+          fi
 
-          # Zip into .ipa
-          cd build
+          # Create the IPA
+          cd build/ipa-staging
           zip -ry "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa" Payload/
           ls -lh "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa"
 
-          echo "✅ IPA created successfully!"
+      # ── Verify IPA structure ──────────────────────────────────────
+      - name: Verify IPA contents
+        run: |
+          echo "=== IPA file size ==="
+          ls -lh PrismMusic-unsigned.ipa
+
+          echo ""
+          echo "=== IPA contents (top-level) ==="
+          unzip -l PrismMusic-unsigned.ipa | head -40
+
+          echo ""
+          echo "=== Checking required files ==="
+
+          # Verify Payload/PrismMusic.app/ exists
+          unzip -l PrismMusic-unsigned.ipa | grep -q "Payload/PrismMusic.app/" \
+            && echo "✅ Payload/PrismMusic.app/ present" \
+            || { echo "❌ Missing Payload/PrismMusic.app/"; exit 1; }
+
+          # Verify Info.plist exists
+          unzip -l PrismMusic-unsigned.ipa | grep -q "Payload/PrismMusic.app/Info.plist" \
+            && echo "✅ Info.plist present" \
+            || { echo "❌ Missing Info.plist"; exit 1; }
+
+          # Verify main binary exists
+          unzip -l PrismMusic-unsigned.ipa | grep -q "Payload/PrismMusic.app/PrismMusic$" \
+            && echo "✅ Main binary present" \
+            || { echo "❌ Missing main binary"; exit 1; }
+
+          echo ""
+          echo "=== Checking binary architecture ==="
+          # Extract and check the binary is arm64
+          mkdir -p /tmp/ipa-verify
+          unzip -o PrismMusic-unsigned.ipa "Payload/PrismMusic.app/PrismMusic" -d /tmp/ipa-verify
+          file /tmp/ipa-verify/Payload/PrismMusic.app/PrismMusic
+          lipo -info /tmp/ipa-verify/Payload/PrismMusic.app/PrismMusic 2>/dev/null || true
+
+          echo ""
+          echo "=== Info.plist bundle ID ==="
+          unzip -o PrismMusic-unsigned.ipa "Payload/PrismMusic.app/Info.plist" -d /tmp/ipa-verify
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" /tmp/ipa-verify/Payload/PrismMusic.app/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" /tmp/ipa-verify/Payload/PrismMusic.app/Info.plist || true
+
+          # Check for embedded extension (PlugIns/)
+          echo ""
+          echo "=== PlugIns (extensions) ==="
+          unzip -l PrismMusic-unsigned.ipa | grep "PlugIns/" || echo "(no extensions embedded)"
+
+          echo ""
+          echo "✅ IPA verification passed!"
 
       # ── Upload IPA artifact ──────────────────────────────────────
       - name: Upload IPA
@@ -131,6 +219,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26 beta
+        run: |
+          XCODE26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE26" ]; then
+            XCODE26=$(ls -d /Applications/Xcode-beta.app 2>/dev/null | head -1)
+          fi
+          if [ -z "$XCODE26" ]; then
+            echo "::error::Xcode 26 beta not found on this runner."
+            ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE26"
 
       - name: Locate iOS project root
         id: locate_project

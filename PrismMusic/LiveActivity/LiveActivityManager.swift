@@ -19,9 +19,6 @@ final class LiveActivityManager {
     /// running we replace its content state instead of spawning a new one
     /// (a stale activity would otherwise linger in the Dynamic Island).
     func start(track: Track, state: LiveActivityState) {
-        // Activities are only available on iOS 16.1+, and the user must have
-        // them enabled in Settings → Notifications.
-        guard #available(iOS 16.1, *) else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
         if activity != nil {
@@ -45,7 +42,7 @@ final class LiveActivityManager {
 
     /// Push a new content state to the existing activity.
     func update(state: LiveActivityState) {
-        guard #available(iOS 16.1, *) else { return }
+
         guard let activity else { return }
         Task {
             await activity.update(
@@ -57,7 +54,7 @@ final class LiveActivityManager {
     /// Terminate the activity (called when the queue ends or the user
     /// dismisses Now Playing).
     func end() {
-        guard #available(iOS 16.1, *) else { return }
+
         guard let activity else { return }
         Task {
             await activity.end(

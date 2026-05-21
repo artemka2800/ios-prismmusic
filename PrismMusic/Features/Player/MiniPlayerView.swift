@@ -61,18 +61,7 @@ struct MiniPlayerView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
-            .background {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.white.opacity(0.04))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
-                    )
-            }
+            .prismGlass(cornerRadius: 16)
             .overlay(alignment: .bottom) {
                 // Hairline progress indicator at the bottom edge.
                 GeometryReader { proxy in

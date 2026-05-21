@@ -74,12 +74,7 @@ struct SyncedLyricsView: View {
                 }
             }
         }
-        .background(.ultraThinMaterial.opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Layout.cornerLarge))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Layout.cornerLarge)
-                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
-        )
+        .prismGlass(cornerRadius: Theme.Layout.cornerLarge)
         // Top + bottom fade so lines don't pop in/out at the edges.
         .mask(
             LinearGradient(
@@ -105,8 +100,7 @@ struct SyncedLyricsView: View {
                 .foregroundStyle(Theme.Palette.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial.opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Layout.cornerLarge))
+        .prismGlass(cornerRadius: Theme.Layout.cornerLarge)
     }
 
     // MARK: - Active line detection

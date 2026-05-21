@@ -307,13 +307,8 @@ private struct Backdrop: View {
 struct GlassCircleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background {
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(Circle().fill(Color.white.opacity(0.06)))
-            }
+            .prismGlassCircle()
             .foregroundStyle(.white)
-            .clipShape(Circle())
             .scaleEffect(configuration.isPressed ? 0.93 : 1)
             .animation(Theme.Motion.snap, value: configuration.isPressed)
     }

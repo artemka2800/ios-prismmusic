@@ -1,11 +1,12 @@
 # PrismMusic для iOS 26
 
-Нативный iOS-клиент PrismMusic в стилистике web-версии: тёмная Liquid Glass-эстетика, синхронизированный текст с пословной подсветкой, Apple Music-style анимированные обложки и полноценный Dynamic Island через Live Activities.
+Нативный iOS-клиент PrismMusic в стилистике web-версии: тёмная Liquid Glass-эстетика с настоящим `.glassEffect()`, синхронизированный текст с пословной подсветкой, Apple Music-style анимированные обложки и полноценный Dynamic Island через Live Activities.
 
 ## Стек
 
-- **iOS 26** (Liquid Glass, `.glassEffect()`)
-- **SwiftUI** + `@Observable` macro (iOS 17+)
+- **iOS 26** — Liquid Glass (`.glassEffect()`), `tabBarMinimizeBehavior`, native glass tab bar
+- **Swift 6.1** + `@Observable` macro
+- **SwiftUI** — полностью декларативный UI
 - **AVFoundation** — AVPlayer для стриминга, AVAudioSession для фонового воспроизведения
 - **MediaPlayer** — `MPNowPlayingInfoCenter` + `MPRemoteCommandCenter` для lock screen / control center
 - **ActivityKit + WidgetKit** — Live Activity и Dynamic Island
