@@ -126,23 +126,10 @@ struct NowPlayingView: View {
 
     var body: some View {
         ZStack {
-            // Background layer — depends on animated cover setting
-            if app.settings.animatedCover {
-                // Full-screen animated cover (Apple Music lock screen style)
-                FullScreenAnimatedCover(
-                    track: app.audio.currentTrack,
-                    isPlaying: app.audio.isPlaying
-                )
-                .id(app.audio.currentTrack?.id)
-                .transition(.opacity)
-                .animation(.easeInOut(duration: 0.8), value: app.audio.currentTrack?.id)
+            // Classic blurred backdrop
+            Backdrop()
+                .ignoresSafeArea()
                 .allowsHitTesting(false)
-            } else {
-                // Classic blurred backdrop
-                Backdrop()
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
 
             // Transparent tap catcher for lyrics background tap — sits below controls
             if panel == .lyrics {
@@ -224,25 +211,20 @@ struct NowPlayingView: View {
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
-                    } else if !app.settings.animatedCover {
-                        // Show centered square cover only when NOT in full-screen mode
+                    } else {
+                        // Show centered square cover
                         GeometryReader { proxy in
                             let coverSize = min(proxy.size.width, proxy.size.height) * 0.85
                             AnimatedCoverView(
                                 track: app.audio.currentTrack,
                                 isPlaying: app.audio.isPlaying,
-                                size: coverSize,
-                                animatedCoverEnabled: false
+                                size: coverSize
                             )
                             .id(app.audio.currentTrack?.id)
                             .transition(coverTransition)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                         .transition(.scale.combined(with: .opacity))
-                    } else {
-                        // Full-screen mode: empty spacer where cover would be,
-                        // the full-screen image IS the background
-                        Spacer()
                     }
                 }
                 .frame(maxHeight: .infinity)
@@ -359,13 +341,8 @@ struct NowPlayingView: View {
                 .lineLimit(1)
         }
         .id(app.audio.currentTrack?.id)
-        .transition(
-            .asymmetric(
-                insertion: .opacity.combined(with: .move(edge: .bottom)).combined(with: .scale(scale: 0.96)),
-                removal: .opacity.combined(with: .move(edge: .top)).combined(with: .scale(scale: 0.96))
-            )
-        )
-        .animation(.spring(response: 0.5, dampingFraction: 0.82), value: app.audio.currentTrack?.id)
+        .transition(coverTransition)
+        .animation(.spring(response: 0.52, dampingFraction: 0.85), value: app.audio.currentTrack?.id)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 

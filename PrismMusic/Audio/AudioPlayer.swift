@@ -20,6 +20,7 @@ import Combine
 import Foundation
 import MediaPlayer
 import Observation
+import SwiftUI
 import UIKit
 
 @Observable
@@ -132,9 +133,11 @@ final class AudioPlayer {
         } else {
             nextIndex = currentIndex + 1
         }
-        trackChangeDirection = .forward
-        currentIndex = nextIndex
-        load(track: queue[nextIndex], autoplay: true)
+        withAnimation(.spring(response: 0.52, dampingFraction: 0.85)) {
+            trackChangeDirection = .forward
+            currentIndex = nextIndex
+            load(track: queue[nextIndex], autoplay: true)
+        }
     }
 
     func previous() {
@@ -144,10 +147,12 @@ final class AudioPlayer {
             seek(to: 0)
             return
         }
-        trackChangeDirection = .backward
-        let prevIndex = currentIndex == 0 ? queue.count - 1 : currentIndex - 1
-        currentIndex = prevIndex
-        load(track: queue[prevIndex], autoplay: true)
+        withAnimation(.spring(response: 0.52, dampingFraction: 0.85)) {
+            trackChangeDirection = .backward
+            let prevIndex = currentIndex == 0 ? queue.count - 1 : currentIndex - 1
+            currentIndex = prevIndex
+            load(track: queue[prevIndex], autoplay: true)
+        }
     }
 
     func seek(to seconds: Double) {

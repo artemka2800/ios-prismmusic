@@ -47,6 +47,21 @@ final class LibraryStore {
         persist()
     }
 
+    func importYandexTracks(_ tracks: [Track]) -> Int {
+        var addedCount = 0
+        for track in tracks {
+            if !likedTrackIDs.contains(track.id) {
+                likedTrackIDs.insert(track.id)
+                likedTracks.insert(track, at: 0)
+                addedCount += 1
+            }
+        }
+        if addedCount > 0 {
+            persist()
+        }
+        return addedCount
+    }
+
     private func persist() {
         let defaults = UserDefaults.standard
         defaults.set(Array(likedTrackIDs), forKey: Keys.likedIDs)

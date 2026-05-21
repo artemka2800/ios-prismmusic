@@ -34,13 +34,10 @@ final class APIClient {
 
     // MARK: - Endpoints
 
-    /// `GET /api/music/search?q=...&token=...`
+    /// `GET /api/music/search?q=...`
     func search(query: String) async throws -> SearchResponse {
         var components = try makeComponents(path: "/api/music/search")
         components.queryItems = [URLQueryItem(name: "q", value: query)]
-        if !settings.yandexToken.isEmpty {
-            components.queryItems?.append(URLQueryItem(name: "token", value: settings.yandexToken))
-        }
         return try await request(components, as: SearchResponse.self)
     }
 
@@ -101,6 +98,29 @@ final class APIClient {
         return response.tracks
     }
 
+    /// `POST /api/music/yandex/import` — imports Yandex Liked tracks.
+    func importYandexLikes() async throws -> YandexImportResponse {
+        var components = try makeComponents(path: "/api/music/yandex/import")
+        guard let url = components.url else { throw APIError.invalidBackendURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.cachePolicy = .reloadRevalidatingCacheData
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !settings.yandexToken.isEmpty {
+            req.setValue(settings.yandexToken, forHTTPHeaderField: "x-yandex-token")
+        }
+        req.httpBody = try JSONSerialization.data(withJSONObject: [:])
+        
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let bodyPreview = String(data: data.prefix(APIConfig.errorBodyLogLimit), encoding: .utf8)
+            throw APIError.httpStatus(http.statusCode, bodyPreview)
+        }
+        return try decoder.decode(YandexImportResponse.self, from: data)
+    }
+
     // MARK: - Plumbing
 
     private func makeComponents(path: String) throws -> URLComponents {
@@ -124,6 +144,9 @@ final class APIClient {
         // from a previous app version with a different response schema.
         req.cachePolicy = .reloadRevalidatingCacheData
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !settings.yandexToken.isEmpty {
+            req.setValue(settings.yandexToken, forHTTPHeaderField: "x-yandex-token")
+        }
 
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }

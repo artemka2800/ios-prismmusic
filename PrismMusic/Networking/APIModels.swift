@@ -147,3 +147,8 @@ struct PlaylistDetailResponse: Decodable, Sendable {
         case id, name, coverUrl, description, tracks, source
     }
 }
+
+/// `POST /api/music/yandex/import` — returns imported likes and playlists.
+struct YandexImportResponse: Decodable, Sendable {
+    let importedLikes: [Track]
+}

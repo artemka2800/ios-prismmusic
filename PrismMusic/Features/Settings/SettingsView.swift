@@ -16,6 +16,9 @@ struct SettingsView: View {
     @State private var savedFlash = false
     @State private var showDebugLogs = false
     @State private var logsContent = ""
+    @State private var isImporting = false
+    @State private var showImportAlert = false
+    @State private var importAlertMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -44,6 +47,23 @@ struct SettingsView: View {
                         Label("Как получить токен?", systemImage: "questionmark.circle")
                             .foregroundStyle(.white)
                     }
+
+                    if !app.settings.yandexToken.isEmpty {
+                        Button {
+                            importYandexLikes()
+                        } label: {
+                            HStack {
+                                Label("Импортировать любимые треки", systemImage: "arrow.down.circle")
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                if isImporting {
+                                    ProgressView()
+                                        .tint(.white)
+                                }
+                            }
+                        }
+                        .disabled(isImporting)
+                    }
                 } header: {
                     Text("Yandex.Music")
                 } footer: {
@@ -59,19 +79,10 @@ struct SettingsView: View {
                             .foregroundStyle(.white)
                     }
                     .tint(.white)
-
-                    Toggle(isOn: Binding(
-                        get: { app.settings.animatedCover },
-                        set: { app.settings.animatedCover = $0 }
-                    )) {
-                        Label("Анимированная обложка", systemImage: "waveform")
-                            .foregroundStyle(.white)
-                    }
-                    .tint(.white)
                 } header: {
                     Text("Внешний вид")
                 } footer: {
-                    Text("Immersive фон подкрашивает фон приложения цветом текущей обложки. Анимированная обложка включает плавный дрейф, пульсацию подсветки и параллакс по гироскопу.")
+                    Text("Immersive фон подкрашивает фон приложения цветом текущей обложки.")
                 }
 
                 Section {
@@ -122,6 +133,11 @@ struct SettingsView: View {
             } message: {
                 Text("1. Открой music.yandex.ru\n2. DevTools → Application → Cookies → Session_id\n3. Скопируй и вставь сюда. Также можно получить через oauth.yandex.com.")
             }
+            .alert("Импорт любимых треков", isPresented: $showImportAlert) {
+                Button("OK", role: roleCancelForAlert) {}
+            } message: {
+                Text(importAlertMessage)
+            }
             .sheet(isPresented: $showDebugLogs) {
                 NavigationStack {
                     ScrollView {
@@ -143,6 +159,30 @@ struct SettingsView: View {
         .onAppear {
             backendDraft = app.settings.backendURL
             tokenDraft = app.settings.yandexToken
+        }
+    }
+
+    private var roleCancelForAlert: ButtonRole? {
+        #if os(macOS)
+        return nil
+        #else
+        return .cancel
+        #endif
+    }
+
+    private func importYandexLikes() {
+        isImporting = true
+        Task {
+            do {
+                let response = try await app.api.importYandexLikes()
+                let importedTracksCount = app.library.importYandexTracks(response.importedLikes)
+                importAlertMessage = "Успешно импортировано \(importedTracksCount) новых треков из Яндекс.Музыки!"
+                showImportAlert = true
+            } catch {
+                importAlertMessage = "Ошибка импорта: \(error.localizedDescription)"
+                showImportAlert = true
+            }
+            isImporting = false
         }
     }
 
