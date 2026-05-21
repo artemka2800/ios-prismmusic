@@ -1,7 +1,6 @@
 name: iOS Build
 
-# Builds the PrismMusic iOS app on every push that touches the iOS folder
-# and on every pull request. Produces an unsigned simulator-compatible
+# Builds the PrismMusic iOS app and produces an unsigned simulator-compatible
 # `.app` bundle as a downloadable artifact.
 #
 # We can't ship a real `.ipa` from CI without an Apple Developer account
@@ -14,16 +13,11 @@ name: iOS Build
 on:
   push:
     branches: [main]
-    paths:
-      - 'IOS-PrismMusic/**'
-      - '.github/workflows/ios-build.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'IOS-PrismMusic/**'
   workflow_dispatch:
 
-# Allow manual cancellation when a new commit is pushed quickly after.
+# Cancel a running build when a fresh commit lands.
 concurrency:
   group: ios-build-${{ github.ref }}
   cancel-in-progress: true
@@ -32,8 +26,7 @@ jobs:
   build:
     name: Build (Simulator, unsigned)
     # macos-15 runners come with Xcode 16.x preinstalled which gives us the
-    # iOS 18 SDK. Falling back to macos-14 + xcode-select is also possible
-    # if the runner is unavailable.
+    # iOS 18 SDK while still supporting our iOS 17 deployment target.
     runs-on: macos-15
     timeout-minutes: 30
 
@@ -47,27 +40,48 @@ jobs:
           xcodebuild -version
           swift --version
 
+      # Locate the Swift project. Two possible layouts:
+      #   (a) repo root IS the iOS project (project.yml at top level)
+      #   (b) the iOS project lives in `IOS-PrismMusic/` (or any other
+      #       single sub-folder containing project.yml)
+      - name: Locate iOS project root
+        id: locate_project
+        run: |
+          if [ -f project.yml ]; then
+            ROOT="."
+          else
+            ROOT=$(find . -maxdepth 3 -name project.yml -not -path './.git/*' -print -quit | xargs -n1 dirname || true)
+          fi
+          if [ -z "$ROOT" ] || [ ! -f "$ROOT/project.yml" ]; then
+            echo "::error::project.yml not found anywhere in the repo."
+            echo "Tree:"
+            find . -maxdepth 3 -type f -name '*.yml' -not -path './.git/*'
+            exit 1
+          fi
+          echo "Found iOS project at: $ROOT"
+          echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+
       # XcodeGen turns project.yml into a real .xcodeproj on the fly. Keeps
       # the repo free of the noisy generated `project.pbxproj` file.
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        working-directory: IOS-PrismMusic
+        working-directory: ${{ steps.locate_project.outputs.root }}
         run: xcodegen generate
 
       # Resolve SPM dependencies once so the build step doesn't have to
       # network out (we don't currently have any, but this is harmless and
       # safer for future deps).
       - name: Resolve Swift Package dependencies
-        working-directory: IOS-PrismMusic
+        working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
           xcodebuild -resolvePackageDependencies \
             -project PrismMusic.xcodeproj \
             -scheme PrismMusic
 
       - name: Build for iOS Simulator
-        working-directory: IOS-PrismMusic
+        working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
           set -o pipefail
           xcodebuild build \
@@ -81,28 +95,31 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             -quiet
 
-      # Locate the produced .app bundle so we can upload it. The iPhone
-      # simulator path varies between Xcode versions, hence the find.
+      # Locate the produced .app bundle so we can upload it. The path
+      # varies between Xcode versions, hence the find.
       - name: Locate built .app bundle
-        id: locate
-        working-directory: IOS-PrismMusic
+        id: locate_app
+        working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
           APP_PATH=$(find build/Build/Products -type d -name 'PrismMusic.app' | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "::error::PrismMusic.app not found in build output."
+            find build -type d -name '*.app' || true
             exit 1
           fi
           echo "Found app at: $APP_PATH"
-          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          # Resolve to an absolute path so the next step can move it.
+          ABS_APP_PATH=$(cd "$(dirname "$APP_PATH")" && pwd)/$(basename "$APP_PATH")
+          echo "app_path=$ABS_APP_PATH" >> "$GITHUB_OUTPUT"
 
       # Zip the .app — GitHub artifact uploader doesn't preserve macOS
-      # bundle metadata otherwise (it'd flatten Contents/* directories).
+      # bundle metadata otherwise (it would flatten Contents/* directories).
       - name: Package .app
-        working-directory: IOS-PrismMusic
         run: |
-          cd "$(dirname '${{ steps.locate.outputs.app_path }}')"
-          zip -ry PrismMusic-Simulator.zip PrismMusic.app
-          mv PrismMusic-Simulator.zip "$GITHUB_WORKSPACE/PrismMusic-Simulator.zip"
+          APP_DIR=$(dirname '${{ steps.locate_app.outputs.app_path }}')
+          cd "$APP_DIR"
+          zip -ry "$GITHUB_WORKSPACE/PrismMusic-Simulator.zip" PrismMusic.app
+          ls -la "$GITHUB_WORKSPACE/PrismMusic-Simulator.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
