@@ -15,9 +15,10 @@ final class LiveActivityManager {
     /// Single in-flight activity at a time (one track playing = one activity).
     private var activity: Activity<LiveActivityAttributes>?
 
-    /// Single shared instance of authorization info to prevent the iOS simulator/system crash
-    /// caused by creating multiple instances of ActivityAuthorizationInfo.
-    private let authorizationInfo = ActivityAuthorizationInfo()
+    /// Defer creation of ActivityAuthorizationInfo until we actually need it.
+    /// Creating it synchronously during app launch (before applicationDidFinishLaunching)
+    /// causes a severe crash on iOS because activityd rejects the XPC connection.
+    private var authorizationInfo: ActivityAuthorizationInfo?
 
     /// Safety switch to completely disable Live Activities.
     /// Default to false on Simulator to avoid system environment crashes.
@@ -27,9 +28,24 @@ final class LiveActivityManager {
     public static var isEnabled = true
     #endif
 
+    init() {
+        guard Self.isEnabled else { return }
+        // Clean up any dangling activities from previous app sessions immediately.
+        // Failing to do this causes ActivityKit to hit the 5-activity limit
+        // and throw a fatal exception when `Activity.request` is called.
+        Task {
+            for existing in Activity<LiveActivityAttributes>.activities {
+                await existing.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+    }
+
     private var canUseLiveActivities: Bool {
         guard Self.isEnabled else { return false }
-        return authorizationInfo.areActivitiesEnabled
+        if authorizationInfo == nil {
+            authorizationInfo = ActivityAuthorizationInfo()
+        }
+        return authorizationInfo?.areActivitiesEnabled ?? false
     }
 
     /// Start a fresh Live Activity for the given track. If one is already
@@ -53,6 +69,8 @@ final class LiveActivityManager {
             )
         } catch {
             print("[LiveActivity] failed to start: \(error)")
+            // Soft-fail: if the system still rejects the request, we just catch
+            // and log it instead of letting the app crash.
         }
     }
 

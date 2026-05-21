@@ -39,6 +39,9 @@ struct HomeView: View {
                 await app.recommendations.refresh(client: app.api)
             }
             .navigationBarHidden(true)
+            .navigationDestination(for: Album.self) { album in
+                PlaylistDetailView(album: album)
+            }
         }
     }
 
@@ -190,7 +193,7 @@ struct AlbumCardView: View {
     @State private var isPressed = false
 
     var body: some View {
-        NavigationLink(destination: PlaylistDetailView(album: album)) {
+        NavigationLink(value: album) {
             VStack(alignment: .leading, spacing: 8) {
                 // Square cover with play overlay
                 ZStack {
