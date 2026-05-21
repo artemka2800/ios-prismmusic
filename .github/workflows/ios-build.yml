@@ -85,54 +85,43 @@ jobs:
 
       # ── Build for device (unsigned) ───────────────────────────────
       # Strategy: build with CODE_SIGN_IDENTITY="" (empty = no signing)
-      # then manually strip any _CodeSignature folders and package IPA.
-      # AltStore/Sideloadly will re-sign the binary from scratch.
-      - name: Build for iOS device
+      # ── Archive ───────────────────────────────────────────────────
+      - name: Archive for iOS device
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
           set -o pipefail
-          xcodebuild build \
+          xcodebuild archive \
             -project PrismMusic.xcodeproj \
             -scheme PrismMusic \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
+            -archivePath build/PrismMusic.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             -quiet
 
-      # ── Locate the .app ──────────────────────────────────────────
-      - name: Locate built .app bundle
-        id: locate_app
-        working-directory: ${{ steps.locate_project.outputs.root }}
-        run: |
-          APP_PATH=$(find build/Build/Products -type d -name 'PrismMusic.app' | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "::error::PrismMusic.app not found in build output."
-            echo "Build products tree:"
-            find build/Build/Products -type d -maxdepth 4 || true
-            exit 1
-          fi
-          echo "Found app at: $APP_PATH"
-          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
-
-      # ── Create .ipa from .app ─────────────────────────────────────
-      # AltServer error 2005 happens when:
-      #   1. _CodeSignature contains invalid/partial signatures
-      #   2. The binary has an ad-hoc signature (CODE_SIGN_IDENTITY="-")
-      #
-      # Fix: strip old signatures, convert binary plists to XML, then
-      # ad-hoc sign so AltStore can parse the Mach-O headers.
+      # ── Create IPA from .xcarchive ─────────────────────────────
+      # We extract the .app from the archive, convert plists to XML,
+      # ad-hoc sign, and package into a standard IPA structure.
       - name: Create unsigned IPA
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
-          APP_PATH="${{ steps.locate_app.outputs.app_path }}"
+          ARCHIVE_APP="build/PrismMusic.xcarchive/Products/Applications/PrismMusic.app"
+          if [ ! -d "$ARCHIVE_APP" ]; then
+            echo "::error::PrismMusic.app not found in archive."
+            echo "Archive contents:"
+            find build/PrismMusic.xcarchive -type d -maxdepth 4 || true
+            exit 1
+          fi
+          echo "Found app at: $ARCHIVE_APP"
 
           # Build Payload structure
           mkdir -p build/ipa-staging/Payload
-          cp -R "$APP_PATH" build/ipa-staging/Payload/
+          cp -R "$ARCHIVE_APP" build/ipa-staging/Payload/
+
+          MAIN_APP="build/ipa-staging/Payload/PrismMusic.app"
 
           # ── Step 1: Strip ALL old code signatures ─────────────────
           echo "Stripping old code signatures..."
@@ -140,36 +129,27 @@ jobs:
           find build/ipa-staging/Payload -name "*.mobileprovision" -delete 2>/dev/null || true
 
           # ── Step 2: Convert binary plists to XML ──────────────────
-          # AltStore/Sideloadly sometimes fail with NSCocoaErrorDomain 3840
-          # when Info.plist is in binary format. Convert all to XML1.
           echo "Converting binary plists to XML..."
-          find build/ipa-staging/Payload -name "*.plist" -exec sh -c '
-            for f; do
-              if file "$f" | grep -q "Apple binary property list"; then
-                plutil -convert xml1 "$f" && echo "  Converted: $f"
-              fi
-            done
-          ' _ {} +
+          find build/ipa-staging/Payload -name "*.plist" | while read -r pfile; do
+            if file "$pfile" | grep -q "Apple binary property list"; then
+              plutil -convert xml1 "$pfile" && echo "  Converted: $pfile"
+            fi
+          done
 
-          # ── Step 3: Ad-hoc sign the binary ────────────────────────
-          # AltStore requires valid Mach-O signature headers to parse
-          # the app. A bare ad-hoc signature (no identity) satisfies this
-          # without requiring a certificate. AltStore replaces it when
-          # it installs the app.
-          echo "Ad-hoc signing main binary..."
-          MAIN_APP="build/ipa-staging/Payload/PrismMusic.app"
+          # ── Step 3: Ad-hoc sign ──────────────────────────────────
+          echo "Ad-hoc signing..."
 
-          # Sign frameworks first (if any)
+          # Sign frameworks
           if [ -d "$MAIN_APP/Frameworks" ]; then
-            find "$MAIN_APP/Frameworks" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) -print0 | while IFS= read -r -d '' fw; do
-              codesign --force --sign - --timestamp=none "$fw" && echo "  Signed framework: $(basename "$fw")" || true
+            find "$MAIN_APP/Frameworks" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) | while read -r fw; do
+              codesign --force --sign - --timestamp=none "$fw" && echo "  Signed: $(basename "$fw")" || true
             done
           fi
 
-          # Sign extensions (PlugIns)
+          # Sign extensions
           if [ -d "$MAIN_APP/PlugIns" ]; then
-            find "$MAIN_APP/PlugIns" -maxdepth 1 -name "*.appex" -print0 | while IFS= read -r -d '' ext; do
-              codesign --force --sign - --timestamp=none "$ext" && echo "  Signed extension: $(basename "$ext")" || true
+            find "$MAIN_APP/PlugIns" -maxdepth 1 -name "*.appex" | while read -r ext; do
+              codesign --force --sign - --timestamp=none "$ext" && echo "  Signed: $(basename "$ext")" || true
             done
           fi
 
@@ -177,14 +157,11 @@ jobs:
           codesign --force --sign - --timestamp=none "$MAIN_APP" && echo "  Signed: PrismMusic.app"
 
           echo ""
-          echo "Frameworks in bundle:"
-          ls -la "$MAIN_APP/Frameworks/" 2>/dev/null || echo "(no frameworks)"
-          echo "PlugIns in bundle:"
-          ls -la "$MAIN_APP/PlugIns/" 2>/dev/null || echo "(no plugins)"
+          echo "Frameworks:" && ls "$MAIN_APP/Frameworks/" 2>/dev/null || echo "(none)"
+          echo "PlugIns:" && ls "$MAIN_APP/PlugIns/" 2>/dev/null || echo "(none)"
 
           # ── Step 4: Create the IPA ────────────────────────────────
           cd build/ipa-staging
-          # Use -y to preserve symlinks (important for frameworks)
           zip -ry "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa" Payload/
           ls -lh "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa"
 
@@ -216,11 +193,11 @@ jobs:
             && echo "✅ Main binary present" \
             || { echo "❌ Missing main binary"; exit 1; }
 
-          # Verify NO _CodeSignature folders remain
+          # Verify _CodeSignature is present (from ad-hoc signing)
           if unzip -l PrismMusic-unsigned.ipa | grep -q "_CodeSignature"; then
-            echo "⚠️  WARNING: _CodeSignature folders found — they should have been stripped"
+            echo "✅ _CodeSignature present (ad-hoc signed)"
           else
-            echo "✅ No _CodeSignature folders (clean for AltStore)"
+            echo "⚠️  WARNING: No _CodeSignature — binary may not be signed"
           fi
 
           echo ""

@@ -73,10 +73,16 @@ final class APIClient {
 
     /// Builds the proxied stream URL for a given track. AVPlayer hits this
     /// URL directly; we never download the bytes ourselves.
+    ///
+    /// The backend stream endpoint accepts `?id=<trackId>&source=<source>`
+    /// and resolves the actual audio URL server-side. The iOS client never
+    /// needs the raw audio URL.
     func streamURL(for track: Track) -> URL? {
-        guard let originalURL = track.streamURL else { return nil }
         guard var components = try? makeComponents(path: "/api/music/stream") else { return nil }
-        var items: [URLQueryItem] = [URLQueryItem(name: "url", value: originalURL.absoluteString)]
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "id", value: track.id),
+            URLQueryItem(name: "source", value: track.source?.rawValue ?? "soundcloud"),
+        ]
         if track.source == .yandex, !settings.yandexToken.isEmpty {
             items.append(URLQueryItem(name: "token", value: settings.yandexToken))
         }
