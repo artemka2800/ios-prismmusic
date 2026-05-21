@@ -161,17 +161,15 @@ jobs:
 
           # Sign frameworks first (if any)
           if [ -d "$MAIN_APP/Frameworks" ]; then
-            for fw in "$MAIN_APP"/Frameworks/*.framework "$MAIN_APP"/Frameworks/*.dylib 2>/dev/null; do
-              [ -e "$fw" ] || continue
-              codesign --force --sign - --timestamp=none "$fw" 2>/dev/null && echo "  Signed framework: $(basename $fw)" || true
+            find "$MAIN_APP/Frameworks" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) -print0 | while IFS= read -r -d '' fw; do
+              codesign --force --sign - --timestamp=none "$fw" && echo "  Signed framework: $(basename "$fw")" || true
             done
           fi
 
           # Sign extensions (PlugIns)
           if [ -d "$MAIN_APP/PlugIns" ]; then
-            for ext in "$MAIN_APP"/PlugIns/*.appex 2>/dev/null; do
-              [ -e "$ext" ] || continue
-              codesign --force --sign - --timestamp=none "$ext" 2>/dev/null && echo "  Signed extension: $(basename $ext)" || true
+            find "$MAIN_APP/PlugIns" -maxdepth 1 -name "*.appex" -print0 | while IFS= read -r -d '' ext; do
+              codesign --force --sign - --timestamp=none "$ext" && echo "  Signed extension: $(basename "$ext")" || true
             done
           fi
 
