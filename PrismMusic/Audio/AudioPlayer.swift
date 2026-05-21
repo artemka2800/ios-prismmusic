@@ -487,7 +487,7 @@ final class AudioPlayer {
     // MARK: - Widget State Sync
 
     func updateWidgetState(force: Bool = false) {
-        let defaults = UserDefaults(suiteName: "group.com.prism.music")
+        let defaults = UserDefaults.appGroup
         
         let title = currentTrack?.title ?? "Не воспроизводится"
         let artist = currentTrack?.artist ?? ""
@@ -573,3 +573,19 @@ final class AudioPlayer {
     }
 
 }
+
+extension UserDefaults {
+    static var appGroup: UserDefaults? {
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
+        var components = bundleId.components(separatedBy: ".")
+        if components.last == "widget" {
+            components.removeLast()
+        }
+        if components.last == "app" {
+            components.removeLast()
+        }
+        let appGroupId = "group." + components.joined(separator: ".")
+        return UserDefaults(suiteName: appGroupId)
+    }
+}
+

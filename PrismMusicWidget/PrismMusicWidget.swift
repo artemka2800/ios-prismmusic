@@ -54,7 +54,7 @@ struct Provider: TimelineProvider {
     }
     
     private func readCurrentEntry() -> MusicWidgetEntry {
-        let defaults = UserDefaults(suiteName: "group.com.prism.music")
+        let defaults = UserDefaults.appGroup
         let title = defaults?.string(forKey: "widget.track.title") ?? "Не воспроизводится"
         let artist = defaults?.string(forKey: "widget.track.artist") ?? ""
         let album = defaults?.string(forKey: "widget.track.album") ?? ""
@@ -75,7 +75,7 @@ struct Provider: TimelineProvider {
     }
     
     private func fetchCurrentEntrySync() -> MusicWidgetEntry {
-        let defaults = UserDefaults(suiteName: "group.com.prism.music")
+        let defaults = UserDefaults.appGroup
         let title = defaults?.string(forKey: "widget.track.title") ?? "Не воспроизводится"
         let artist = defaults?.string(forKey: "widget.track.artist") ?? ""
         let album = defaults?.string(forKey: "widget.track.album") ?? ""
@@ -362,3 +362,19 @@ struct PrismMusicWidget: Widget {
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
+
+extension UserDefaults {
+    static var appGroup: UserDefaults? {
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
+        var components = bundleId.components(separatedBy: ".")
+        if components.last == "widget" {
+            components.removeLast()
+        }
+        if components.last == "app" {
+            components.removeLast()
+        }
+        let appGroupId = "group." + components.joined(separator: ".")
+        return UserDefaults(suiteName: appGroupId)
+    }
+}
+
