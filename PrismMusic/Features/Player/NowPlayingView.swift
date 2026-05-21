@@ -20,39 +20,143 @@ struct NowPlayingView: View {
 
     enum Panel: Equatable { case none, lyrics, queue }
     @State private var panel: Panel = .none
+    @State private var showControls = true
+    @State private var hideControlsTask: Task<Void, Never>? = nil
+    @State private var sleepMinutes: Int? = nil
+    @State private var sleepTask: Task<Void, Never>? = nil
+
+    private func setSleepTimer(_ minutes: Int?) {
+        sleepMinutes = minutes
+        startSleepTimer()
+    }
+
+    private func startSleepTimer() {
+        sleepTask?.cancel()
+        guard let minutes = sleepMinutes, app.audio.isPlaying else { return }
+        sleepTask = Task {
+            try? await Task.sleep(nanoseconds: UInt64(minutes) * 60 * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            if app.audio.isPlaying {
+                app.audio.togglePlay()
+            }
+            sleepMinutes = nil
+        }
+    }
+
+    private func shareTrack() {
+        guard let track = app.audio.currentTrack else { return }
+        let shareText = "Послушай \(track.title) — \(track.artist) в PrismMusic"
+        
+        let activityVC = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            if let popoverController = activityVC.popoverPresentationController {
+                popoverController.sourceView = rootVC.view
+                popoverController.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                popoverController.permittedArrowDirections = []
+            }
+            rootVC.present(activityVC, animated: true)
+        }
+    }
+
+    private func resetIdleTimer() {
+        guard panel == .lyrics else {
+            withAnimation(Theme.Motion.apple) {
+                showControls = true
+            }
+            hideControlsTask?.cancel()
+            return
+        }
+        withAnimation(Theme.Motion.apple) {
+            showControls = true
+        }
+        hideControlsTask?.cancel()
+        hideControlsTask = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+            guard !Task.isCancelled else { return }
+            withAnimation(Theme.Motion.appleLong) {
+                showControls = false
+            }
+        }
+    }
+
+    private func cancelIdleTimer() {
+        hideControlsTask?.cancel()
+        withAnimation(Theme.Motion.apple) {
+            showControls = true
+        }
+    }
+
+    private func handleBackgroundTap() {
+        guard panel == .lyrics else { return }
+        if showControls {
+            withAnimation(Theme.Motion.apple) {
+                showControls = false
+            }
+            hideControlsTask?.cancel()
+        } else {
+            resetIdleTimer()
+        }
+    }
 
     var body: some View {
         ZStack {
             // Cover-tinted backdrop fills the whole screen.
             Backdrop()
                 .ignoresSafeArea()
+                .onTapGesture {
+                    handleBackgroundTap()
+                }
 
             VStack(spacing: 0) {
-                topBar
-                    .padding(.top, 8)
+                if showControls {
+                    topBar
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 Spacer(minLength: 12)
 
                 GeometryReader { proxy in
                     let coverSize = min(proxy.size.width, proxy.size.height) * 0.85
-                    HStack(alignment: .center, spacing: 16) {
-                        AnimatedCoverView(
-                            track: app.audio.currentTrack,
-                            isPlaying: app.audio.isPlaying,
-                            size: coverSize
-                        )
-                        .id(app.audio.currentTrack?.id)   // forces motion reset on change
-
+                    ZStack {
                         if panel == .lyrics {
                             SyncedLyricsView(
                                 lyrics: app.audio.lyrics,
                                 progress: app.audio.progress,
                                 duration: app.audio.duration,
                                 isPlaying: app.audio.isPlaying,
-                                onSeek: { app.audio.seek(to: $0) }
+                                onSeek: { app.audio.seek(to: $0) },
+                                onInteraction: {
+                                    resetIdleTimer()
+                                }
                             )
-                            .frame(width: coverSize)
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                handleBackgroundTap()
+                            }
+                            .transition(.opacity)
+                        } else if panel == .queue {
+                            QueueView(
+                                queue: app.audio.queue,
+                                currentIndex: app.audio.currentIndex,
+                                isPlaying: app.audio.isPlaying,
+                                onSelectTrack: { index in
+                                    app.audio.play(queue: app.audio.queue, startAt: index)
+                                }
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(.opacity)
+                        } else {
+                            AnimatedCoverView(
+                                track: app.audio.currentTrack,
+                                isPlaying: app.audio.isPlaying,
+                                size: coverSize
+                            )
+                            .id(app.audio.currentTrack?.id)   // forces motion reset on change
+                            .transition(.scale.combined(with: .opacity))
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -60,22 +164,45 @@ struct NowPlayingView: View {
                 }
                 .frame(maxHeight: .infinity)
 
-                trackInfo
-                    .padding(.horizontal, Theme.Layout.screenInset)
-                    .padding(.top, 16)
+                if showControls {
+                    VStack(spacing: 0) {
+                        trackInfo
+                            .padding(.horizontal, Theme.Layout.screenInset)
+                            .padding(.top, 16)
 
-                progress
-                    .padding(.horizontal, Theme.Layout.screenInset)
-                    .padding(.top, 18)
+                        progress
+                            .padding(.horizontal, Theme.Layout.screenInset)
+                            .padding(.top, 18)
 
-                playbackControls
-                    .padding(.top, 14)
+                        playbackControls
+                            .padding(.top, 14)
 
-                actionRow
-                    .padding(.top, 18)
-                    .padding(.horizontal, Theme.Layout.screenInset)
-                    .padding(.bottom, 28)
+                        actionRow
+                            .padding(.top, 18)
+                            .padding(.horizontal, Theme.Layout.screenInset)
+                            .padding(.bottom, 28)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+        }
+        .onAppear {
+            if panel == .lyrics {
+                resetIdleTimer()
+            }
+        }
+        .onDisappear {
+            cancelIdleTimer()
+        }
+        .onChange(of: panel) { _, newPanel in
+            if newPanel == .lyrics {
+                resetIdleTimer()
+            } else {
+                cancelIdleTimer()
+            }
+        }
+        .onChange(of: app.audio.isPlaying) { _, _ in
+            startSleepTimer()
         }
     }
 
@@ -226,36 +353,84 @@ struct NowPlayingView: View {
 
     private var actionRow: some View {
         HStack {
-            ForEach(actionButtons, id: \.symbol) { item in
-                Spacer()
-                Button(action: item.action) {
-                    Image(systemName: item.symbol)
-                        .font(.system(size: 17, weight: .medium))
-                        .frame(width: 44, height: 44)
-                        .foregroundStyle(item.tinted ? Color.white : Theme.Palette.textSecondary)
-                }
-                .buttonStyle(.plain)
-                Spacer()
+            Spacer()
+
+            // Like
+            let liked = app.audio.currentTrack.map(app.library.isLiked) ?? false
+            Button(action: app.audio.toggleLike) {
+                Image(systemName: liked ? "heart.fill" : "heart")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(liked ? Color.white : Theme.Palette.textSecondary)
             }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            // Lyrics (music.mic like website)
+            Button(action: { togglePanel(.lyrics) }) {
+                Image(systemName: "music.mic")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(panel == .lyrics ? Color.white : Theme.Palette.textSecondary)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            // Queue
+            Button(action: { togglePanel(.queue) }) {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(panel == .queue ? Color.white : Theme.Palette.textSecondary)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            // Sleep Timer Menu
+            Menu {
+                Button("Выключить") {
+                    setSleepTimer(nil)
+                }
+                ForEach([15, 30, 45, 60], id: \.self) { minutes in
+                    Button("\(minutes) мин") {
+                        setSleepTimer(minutes)
+                    }
+                }
+            } label: {
+                Image(systemName: sleepMinutes != nil ? "moon.zzz.fill" : "moon.zzz")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(sleepMinutes != nil ? Color.white : Theme.Palette.textSecondary)
+                    .overlay(alignment: .topTrailing) {
+                        if let sleepMinutes {
+                            Text("\(sleepMinutes)")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(.white))
+                                .offset(x: 4, y: -4)
+                        }
+                    }
+            }
+            .menuStyle(.button)
+
+            Spacer()
+
+            // Share
+            Button(action: shareTrack) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(Theme.Palette.textSecondary)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
         }
-    }
-
-    private var actionButtons: [ActionItem] {
-        let liked = app.audio.currentTrack.map(app.library.isLiked) ?? false
-        return [
-            ActionItem(symbol: liked ? "heart.fill" : "heart", tinted: liked, action: app.audio.toggleLike),
-            ActionItem(symbol: "text.alignleft", tinted: panel == .lyrics, action: { togglePanel(.lyrics) }),
-            ActionItem(symbol: "list.bullet", tinted: panel == .queue, action: { togglePanel(.queue) }),
-            ActionItem(symbol: app.audio.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", action: app.audio.toggleMute),
-            ActionItem(symbol: "moon.zzz", action: {}),
-            ActionItem(symbol: "square.and.arrow.up", action: {}),
-        ]
-    }
-
-    private struct ActionItem {
-        let symbol: String
-        var tinted: Bool = false
-        let action: () -> Void
     }
 
     private func togglePanel(_ target: Panel) {
@@ -358,5 +533,43 @@ private struct ProgressSlider: View {
             )
         }
         .frame(height: 18)
+    }
+}
+
+// MARK: - Queue View
+
+private struct QueueView: View {
+    let queue: [Track]
+    let currentIndex: Int
+    let isPlaying: Bool
+    let onSelectTrack: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Очередь воспроизведения")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Theme.Palette.textPrimary)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(spacing: 4) {
+                    ForEach(Array(queue.enumerated()), id: \.offset) { index, track in
+                        let isActive = index == currentIndex
+                        TrackRowView(
+                            track: track,
+                            isPlaying: isActive && isPlaying,
+                            onTap: {
+                                onSelectTrack(index)
+                            }
+                        )
+                        .background(isActive ? Color.white.opacity(0.08) : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .padding(.horizontal, 12)
+                    }
+                }
+                .padding(.bottom, 24)
+            }
+        }
     }
 }

@@ -21,6 +21,7 @@ struct SyncedLyricsView: View {
     let duration: Double
     let isPlaying: Bool
     let onSeek: (Double) -> Void
+    var onInteraction: (() -> Void)? = nil
 
     @StateObject private var ticker = LyricsTicker()
 
@@ -65,6 +66,7 @@ struct SyncedLyricsView: View {
                             )
                             .id(line.id)
                             .onTapGesture {
+                                onInteraction?()
                                 if isSynced { onSeek(line.time) }
                             }
                             // Trigger an opacity transition when the active
@@ -75,6 +77,11 @@ struct SyncedLyricsView: View {
                     .padding(.vertical, 80)   // top/bottom breathing room so the centre line can scroll
                     .padding(.horizontal, 20)
                 }
+                .simultaneousGesture(
+                    DragGesture().onChanged { _ in
+                        onInteraction?()
+                    }
+                )
                 .onChange(of: activeIndex) { _, newIndex in
                     guard newIndex >= 0, newIndex < lines.count else { return }
                     withAnimation(Theme.Motion.appleLong) {
@@ -108,6 +115,10 @@ struct SyncedLyricsView: View {
                 .foregroundStyle(Theme.Palette.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onInteraction?()
+        }
     }
 
     // MARK: - Active line detection
