@@ -162,15 +162,16 @@ private struct LineView: View {
     /// We use one Text concatenation: passed words highlight white, future
     /// words dim, the currently-being-spoken word receives a subtle glow.
     private func karaokeText(words: [LyricsWord]) -> some View {
-        var built = Text("")
+        var attributed = AttributedString()
         for (i, word) in words.enumerated() {
             let next = i + 1 < words.count ? words[i + 1].time : (line.endTime ?? word.time + 0.6)
             let state = wordState(start: word.time, end: next)
-            let chunk = Text(word.text + (i == words.count - 1 ? "" : " "))
-                .foregroundColor(state.color)
-            built = built + chunk
+            let text = word.text + (i == words.count - 1 ? "" : " ")
+            var chunk = AttributedString(text)
+            chunk.foregroundColor = state.color
+            attributed.append(chunk)
         }
-        return built
+        return Text(attributed)
     }
 
     private func wordState(start: Double, end: Double) -> (color: Color, glow: Bool) {

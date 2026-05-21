@@ -13,6 +13,7 @@ import Foundation
 import SwiftUI
 import UIKit
 
+@MainActor
 enum ColorExtractor {
     private static var cache: [URL: Color] = [:]
 
