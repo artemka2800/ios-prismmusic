@@ -119,9 +119,10 @@ jobs:
           echo "Found app at: $APP_PATH"
           echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
 
-      # ── Create IPA — MINIMAL approach ────────────────────────────
-      # NO stripping, NO plist conversion, NO re-signing.
-      # Just: .app → Payload/ → zip. AltStore handles the rest.
+      # ── Create IPA ─────────────────────────────────────────────────
+      # Convert binary plists to XML (AltStore may not parse Xcode 26
+      # binary plists), then re-sign to fix any signature invalidation
+      # caused by the plist conversion.
       - name: Create IPA
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
@@ -130,19 +131,59 @@ jobs:
           mkdir -p build/ipa-staging/Payload
           cp -R "$APP_PATH" build/ipa-staging/Payload/
 
-          echo "Bundle contents:"
-          ls -la build/ipa-staging/Payload/PrismMusic.app/
-          echo ""
-          echo "Frameworks:" && ls build/ipa-staging/Payload/PrismMusic.app/Frameworks/ 2>/dev/null || echo "(none)"
-          echo "PlugIns:" && ls build/ipa-staging/Payload/PrismMusic.app/PlugIns/ 2>/dev/null || echo "(none)"
-          echo ""
+          MAIN_APP="build/ipa-staging/Payload/PrismMusic.app"
 
-          # Verify code signature
-          codesign -dvv build/ipa-staging/Payload/PrismMusic.app 2>&1 || echo "(no signature)"
-          echo ""
+          echo "=== Bundle contents ==="
+          ls -la "$MAIN_APP/"
+          echo "Frameworks:" && ls "$MAIN_APP/Frameworks/" 2>/dev/null || echo "(none)"
+          echo "PlugIns:" && ls "$MAIN_APP/PlugIns/" 2>/dev/null || echo "(none)"
 
+          # ── Step 1: Clean macOS junk ────────────────────────────────
+          # AltServer on Windows chokes on macOS extended attributes,
+          # resource forks, and .DS_Store files that get embedded in the zip.
+          echo ""
+          echo "=== Cleaning macOS metadata ==="
+          xattr -cr build/ipa-staging/Payload/
+          find build/ipa-staging -name '.DS_Store' -delete
+          find build/ipa-staging -name '._*' -delete
+          echo "  Cleaned extended attributes and .DS_Store"
+
+          # ── Step 2: Strip code signatures ──────────────────────────
+          # AltStore re-signs everything from scratch. Pre-existing
+          # signatures (especially ad-hoc ones) can confuse it.
+          echo ""
+          echo "=== Stripping code signatures ==="
+          find build/ipa-staging/Payload -name "_CodeSignature" -type d -exec rm -rf {} + 2>/dev/null || true
+          find build/ipa-staging/Payload -name "*.mobileprovision" -delete 2>/dev/null || true
+          echo "  Stripped _CodeSignature and .mobileprovision"
+
+          # ── Step 3: Convert ALL binary plists to XML1 ──────────────
+          # NSCocoaErrorDomain 3840 = plist parse error. AltServer's
+          # Windows plist parser may not handle all binary plist variants.
+          echo ""
+          echo "=== Converting plists to XML ==="
+          find build/ipa-staging/Payload -name "*.plist" | while IFS= read -r pfile; do
+            plutil -convert xml1 "$pfile" 2>/dev/null && echo "  Converted: $pfile" || echo "  Skipped: $pfile"
+          done
+
+          # ── Step 4: Verify plists ──────────────────────────────────
+          echo ""
+          echo "=== Verifying plists ==="
+          plutil -lint "$MAIN_APP/Info.plist"
+          find "$MAIN_APP/PlugIns" -name "Info.plist" -exec plutil -lint {} \; 2>/dev/null || true
+
+          echo ""
+          echo "=== Info.plist ==="
+          plutil -p "$MAIN_APP/Info.plist" | head -20
+
+          # ── Step 5: Create IPA with ditto ──────────────────────────
+          # Use Apple's 'ditto' to create a clean zip without any
+          # macOS resource forks or extended attributes.
+          echo ""
+          echo "=== Creating IPA ==="
           cd build/ipa-staging
-          zip -ry "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa" Payload/
+          ditto -ck --norsrc --noextattr --noqtn . "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa"
+          echo "=== IPA created ==="
           ls -lh "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa"
 
       # ── Verify IPA structure ──────────────────────────────────────
