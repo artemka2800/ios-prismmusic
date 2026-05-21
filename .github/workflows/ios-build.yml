@@ -31,8 +31,6 @@ jobs:
       - name: Select Xcode 26 beta
         run: |
           # Use the latest Xcode 26 beta available on the runner.
-          # macos-15 runners may have Xcode 26 beta pre-installed;
-          # if not, we fall back to xcodes or xcode-select.
           XCODE26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
           if [ -z "$XCODE26" ]; then
             XCODE26=$(ls -d /Applications/Xcode-beta.app 2>/dev/null | head -1)
@@ -86,10 +84,9 @@ jobs:
             -scheme PrismMusic
 
       # ── Build for device (unsigned) ───────────────────────────────
-      # We use `build` instead of `archive` — archive without signing
-      # produces an incomplete .xcarchive that confuses AltStore.
-      # Plain `build` gives us a proper .app bundle with all frameworks
-      # and the extension correctly embedded in PlugIns/.
+      # Strategy: build with CODE_SIGN_IDENTITY="" (empty = no signing)
+      # then manually strip any _CodeSignature folders and package IPA.
+      # AltStore/Sideloadly will re-sign the binary from scratch.
       - name: Build for iOS device
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
@@ -103,8 +100,7 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="-" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY="" \
             -quiet
 
       # ── Locate the .app ──────────────────────────────────────────
@@ -123,13 +119,12 @@ jobs:
           echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
 
       # ── Create .ipa from .app ─────────────────────────────────────
-      # An .ipa is a zip with:
-      #   Payload/
-      #     AppName.app/
-      #       (binary, Info.plist, frameworks, PlugIns, etc.)
+      # AltServer error 2005 happens when:
+      #   1. _CodeSignature contains invalid/partial signatures
+      #   2. The binary has an ad-hoc signature (CODE_SIGN_IDENTITY="-")
       #
-      # We do NOT strip _CodeSignature — AltStore / Sideloadly expect
-      # the standard .app bundle structure and will re-sign it themselves.
+      # Fix: strip ALL _CodeSignature dirs and codesign residue.
+      # AltStore/Sideloadly sign from scratch — they don't need existing sigs.
       - name: Create unsigned IPA
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
@@ -139,12 +134,24 @@ jobs:
           mkdir -p build/ipa-staging/Payload
           cp -R "$APP_PATH" build/ipa-staging/Payload/
 
-          # If Swift runtime libs aren't embedded, copy them for non-jailbreak devices.
-          # On modern iOS (14+) the Swift runtime is always present, so this is
-          # mostly a safety net.
-          if [ -d "$APP_PATH/Frameworks" ]; then
-            echo "Frameworks directory found — Swift support included."
-          fi
+          # CRITICAL: Strip ALL code signatures — AltStore re-signs everything.
+          # Leaving stale/invalid _CodeSignature dirs causes error 2005.
+          echo "Stripping code signatures..."
+          find build/ipa-staging/Payload -name "_CodeSignature" -type d -exec rm -rf {} + 2>/dev/null || true
+          find build/ipa-staging/Payload -name "*.mobileprovision" -delete 2>/dev/null || true
+
+          # Also strip any embedded.mobileprovision
+          rm -f build/ipa-staging/Payload/PrismMusic.app/embedded.mobileprovision 2>/dev/null || true
+
+          # Re-create minimal _CodeSignature with empty CodeResources for AltStore
+          # Some versions of AltStore expect the directory to exist, even if empty.
+          # We'll leave it stripped — modern AltStore handles both.
+
+          echo "Frameworks in bundle:"
+          ls -la build/ipa-staging/Payload/PrismMusic.app/Frameworks/ 2>/dev/null || echo "(no frameworks)"
+
+          echo "PlugIns in bundle:"
+          ls -la build/ipa-staging/Payload/PrismMusic.app/PlugIns/ 2>/dev/null || echo "(no plugins)"
 
           # Create the IPA
           cd build/ipa-staging
@@ -179,9 +186,15 @@ jobs:
             && echo "✅ Main binary present" \
             || { echo "❌ Missing main binary"; exit 1; }
 
+          # Verify NO _CodeSignature folders remain
+          if unzip -l PrismMusic-unsigned.ipa | grep -q "_CodeSignature"; then
+            echo "⚠️  WARNING: _CodeSignature folders found — they should have been stripped"
+          else
+            echo "✅ No _CodeSignature folders (clean for AltStore)"
+          fi
+
           echo ""
           echo "=== Checking binary architecture ==="
-          # Extract and check the binary is arm64
           mkdir -p /tmp/ipa-verify
           unzip -o PrismMusic-unsigned.ipa "Payload/PrismMusic.app/PrismMusic" -d /tmp/ipa-verify
           file /tmp/ipa-verify/Payload/PrismMusic.app/PrismMusic
@@ -192,6 +205,7 @@ jobs:
           unzip -o PrismMusic-unsigned.ipa "Payload/PrismMusic.app/Info.plist" -d /tmp/ipa-verify
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" /tmp/ipa-verify/Payload/PrismMusic.app/Info.plist || true
           /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" /tmp/ipa-verify/Payload/PrismMusic.app/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" /tmp/ipa-verify/Payload/PrismMusic.app/Info.plist || true
 
           # Check for embedded extension (PlugIns/)
           echo ""
