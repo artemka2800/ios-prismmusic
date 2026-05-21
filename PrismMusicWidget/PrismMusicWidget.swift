@@ -42,12 +42,12 @@ struct Provider: TimelineProvider {
         )
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (MusicWidgetEntry) -> ()) {
+    func getSnapshot(in context: Context, completion: @escaping @Sendable (MusicWidgetEntry) -> ()) {
         let entry = readCurrentEntry()
         completion(entry)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+    func getTimeline(in context: Context, completion: @escaping @Sendable (Timeline<Entry>) -> ()) {
         Task {
             let entry = await fetchCurrentEntryAsync()
             let timeline = Timeline(entries: [entry], policy: .atEnd)
