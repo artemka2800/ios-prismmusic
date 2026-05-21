@@ -57,24 +57,18 @@ struct PlaylistDetailView: View {
             }
             .scrollIndicators(.hidden)
 
-            // Custom glass back button
-            VStack {
-                HStack {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 38, height: 38)
-                    }
-                    .buttonStyle(GlassCircleButtonStyle())
-                    .padding(.leading, Theme.Layout.screenInset)
-                    .padding(.top, 8)
-
-                    Spacer()
-                }
-                Spacer()
+        }
+        .overlay(alignment: .topLeading) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 38, height: 38)
             }
+            .buttonStyle(GlassCircleButtonStyle())
+            .padding(.leading, Theme.Layout.screenInset)
+            .padding(.top, 8)
         }
         .navigationBarHidden(true)
         .task {

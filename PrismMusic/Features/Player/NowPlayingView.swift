@@ -114,6 +114,38 @@ struct NowPlayingView: View {
                     topBar
                         .padding(.top, 8)
                         .transition(.move(edge: .top).combined(with: .opacity))
+                } else if panel == .lyrics {
+                    HStack(spacing: 8) {
+                        AsyncImage(url: app.audio.currentTrack?.artworkURL) { phase in
+                            if let image = phase.image {
+                                image.resizable().scaledToFill()
+                            } else {
+                                Color.white.opacity(0.1)
+                            }
+                        }
+                        .frame(width: 28, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(app.audio.currentTrack?.title ?? "—")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                            Text(app.audio.currentTrack?.artist ?? "")
+                                .font(.system(size: 9))
+                                .foregroundStyle(Theme.Palette.textSecondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: 160, alignment: .leading)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .prismGlassCapsule()
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .onTapGesture {
+                        resetIdleTimer()
+                    }
                 }
 
                 Spacer(minLength: 12)
