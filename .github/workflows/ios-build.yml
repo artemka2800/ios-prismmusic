@@ -1,0 +1,113 @@
+name: iOS Build
+
+# Builds the PrismMusic iOS app on every push that touches the iOS folder
+# and on every pull request. Produces an unsigned simulator-compatible
+# `.app` bundle as a downloadable artifact.
+#
+# We can't ship a real `.ipa` from CI without an Apple Developer account
+# (signing certificate + provisioning profile must be uploaded as repo
+# secrets). What we DO produce here is enough to:
+#   - verify the project compiles
+#   - install on iOS Simulator (drag-and-drop)
+#   - serve as input for AltStore / Sideloadly resigning on the user's Mac
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'IOS-PrismMusic/**'
+      - '.github/workflows/ios-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'IOS-PrismMusic/**'
+  workflow_dispatch:
+
+# Allow manual cancellation when a new commit is pushed quickly after.
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (Simulator, unsigned)
+    # macos-15 runners come with Xcode 16.x preinstalled which gives us the
+    # iOS 18 SDK. Falling back to macos-14 + xcode-select is also possible
+    # if the runner is unavailable.
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      # XcodeGen turns project.yml into a real .xcodeproj on the fly. Keeps
+      # the repo free of the noisy generated `project.pbxproj` file.
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: IOS-PrismMusic
+        run: xcodegen generate
+
+      # Resolve SPM dependencies once so the build step doesn't have to
+      # network out (we don't currently have any, but this is harmless and
+      # safer for future deps).
+      - name: Resolve Swift Package dependencies
+        working-directory: IOS-PrismMusic
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project PrismMusic.xcodeproj \
+            -scheme PrismMusic
+
+      - name: Build for iOS Simulator
+        working-directory: IOS-PrismMusic
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project PrismMusic.xcodeproj \
+            -scheme PrismMusic \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -quiet
+
+      # Locate the produced .app bundle so we can upload it. The iPhone
+      # simulator path varies between Xcode versions, hence the find.
+      - name: Locate built .app bundle
+        id: locate
+        working-directory: IOS-PrismMusic
+        run: |
+          APP_PATH=$(find build/Build/Products -type d -name 'PrismMusic.app' | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::PrismMusic.app not found in build output."
+            exit 1
+          fi
+          echo "Found app at: $APP_PATH"
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      # Zip the .app — GitHub artifact uploader doesn't preserve macOS
+      # bundle metadata otherwise (it'd flatten Contents/* directories).
+      - name: Package .app
+        working-directory: IOS-PrismMusic
+        run: |
+          cd "$(dirname '${{ steps.locate.outputs.app_path }}')"
+          zip -ry PrismMusic-Simulator.zip PrismMusic.app
+          mv PrismMusic-Simulator.zip "$GITHUB_WORKSPACE/PrismMusic-Simulator.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrismMusic-Simulator-${{ github.sha }}
+          path: PrismMusic-Simulator.zip
+          if-no-files-found: error
+          retention-days: 14
