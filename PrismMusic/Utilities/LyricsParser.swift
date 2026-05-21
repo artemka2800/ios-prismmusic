@@ -43,8 +43,8 @@ enum LyricsParser {
 
             // The lyric body is whatever follows the LAST line-level timestamp.
             let lastTS = tsMatches.last!
-            let bodyStart = line.index(line.startIndex, offsetBy: lastTS.range.upperBound)
-            let body = String(line[bodyStart...]).trimmingCharacters(in: .whitespaces)
+            guard let lastRange = Range(lastTS.range, in: line) else { continue }
+            let body = String(line[lastRange.upperBound...]).trimmingCharacters(in: .whitespaces)
 
             // Optionally extract word-level timestamps from the body.
             let (cleanText, words) = parseWords(body: body, regex: wordRegex)
