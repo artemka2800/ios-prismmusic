@@ -117,23 +117,11 @@ private struct CoverArt: View {
     let size: CGFloat
 
     var body: some View {
-        Group {
-            if let url {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        placeholder
-                    }
-                }
-            } else {
-                placeholder
-            }
-        }
-        .frame(width: size, height: size)
-    }
-
-    private var placeholder: some View {
+        // NOTE: AsyncImage is strictly prohibited in WidgetKit/LiveActivities
+        // and will cause a runtime crash. To show real cover art, we would
+        // need to download it in the main app, save it to a shared AppGroup,
+        // and pass the local file URL in the LiveActivityState.
+        // For now, we use a clean static placeholder to prevent the crash.
         ZStack {
             LinearGradient(
                 colors: [.white.opacity(0.15), .white.opacity(0.03)],
@@ -144,6 +132,7 @@ private struct CoverArt: View {
                 .font(.system(size: size * 0.45, weight: .medium))
                 .foregroundStyle(.white.opacity(0.5))
         }
+        .frame(width: size, height: size)
     }
 }
 
