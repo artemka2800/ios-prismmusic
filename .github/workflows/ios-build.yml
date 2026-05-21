@@ -223,8 +223,14 @@ jobs:
           echo "=== Binary architecture ==="
           mkdir -p /tmp/ipa-verify
           unzip -o PrismMusic-unsigned.ipa "Payload/PrismMusic.app/PrismMusic" -d /tmp/ipa-verify
+          unzip -o PrismMusic-unsigned.ipa "Payload/PrismMusic.app/PlugIns/PrismMusicWidget.appex/PrismMusicWidget" -d /tmp/ipa-verify
           file /tmp/ipa-verify/Payload/PrismMusic.app/PrismMusic
           lipo -info /tmp/ipa-verify/Payload/PrismMusic.app/PrismMusic 2>/dev/null || true
+          
+          echo ""
+          echo "=== Code Signing Diagnostics ==="
+          codesign -dvvv /tmp/ipa-verify/Payload/PrismMusic.app/PrismMusic || true
+          codesign -dvvv /tmp/ipa-verify/Payload/PrismMusic.app/PlugIns/PrismMusicWidget.appex/PrismMusicWidget || true
 
           echo ""
           echo "=== Info.plist ==="
