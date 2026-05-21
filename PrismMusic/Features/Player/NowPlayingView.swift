@@ -291,6 +291,8 @@ private struct Backdrop: View {
                             .scaleEffect(1.4)
                     }
                 }
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .clipped()
             }
 
             LinearGradient(

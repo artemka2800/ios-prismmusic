@@ -65,6 +65,8 @@ private struct ImmersiveBackground: View {
                             .animation(.easeInOut(duration: 0.8), value: url)
                     }
                 }
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .clipped()
                 // Vignette + dark gradient overlay to keep foreground readable.
                 LinearGradient(
                     colors: [.black.opacity(0.55), .black.opacity(0.85)],

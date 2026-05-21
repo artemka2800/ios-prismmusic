@@ -95,6 +95,8 @@ struct HomeView: View {
                     defaultHeroGradient
                 }
             }
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            .clipped()
         } else {
             defaultHeroGradient
         }
@@ -221,8 +223,6 @@ struct AlbumCardView: View {
                 // Square cover with play overlay
                 ZStack {
                     coverImage
-                        .aspectRatio(1, contentMode: .fill)
-                        .clipped()
 
                     // Play / loading overlay
                     if isLoading {
@@ -282,6 +282,8 @@ struct AlbumCardView: View {
                     }
             }
         }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .clipped()
     }
 
     private var fallbackCover: some View {
