@@ -1,0 +1,84 @@
+//
+//  TrackRowView.swift
+//  PrismMusic
+//
+//  Reusable horizontal row that displays a track with cover, title, artist,
+//  source badge and an optional trailing action (typically the like button).
+//  Used in Home, Search, and Library lists so the visual language stays
+//  consistent.
+//
+
+import SwiftUI
+
+struct TrackRowView: View {
+    let track: Track
+    let isPlaying: Bool
+    var onTap: () -> Void
+    var onLikeToggle: (() -> Void)?
+    var liked: Bool = false
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                AsyncImage(url: track.artworkURL) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Color.white.opacity(0.06)
+                    }
+                }
+                .frame(width: 50, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(alignment: .center) {
+                    if isPlaying {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .symbolEffect(.variableColor.iterative, options: .repeating)
+                            .padding(6)
+                            .background(.black.opacity(0.55), in: Circle())
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track.title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(isPlaying ? Color.white : Theme.Palette.textPrimary)
+                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(track.artist)
+                            .lineLimit(1)
+                        if let source = track.source {
+                            Text("·")
+                            Text(source.label)
+                                .foregroundStyle(Theme.Palette.textTertiary)
+                        }
+                    }
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.Palette.textSecondary)
+                }
+
+                Spacer()
+
+                if let onLikeToggle {
+                    Button(action: onLikeToggle) {
+                        Image(systemName: liked ? "heart.fill" : "heart")
+                            .font(.system(size: 16, weight: .medium))
+                            .frame(width: 36, height: 36)
+                            .foregroundStyle(liked ? Color.white : Theme.Palette.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .contentTransition(.symbolEffect(.replace))
+                }
+
+                Text(track.durationLabel)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.Palette.textTertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}

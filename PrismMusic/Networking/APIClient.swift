@@ -1,0 +1,136 @@
+//
+//  APIClient.swift
+//  PrismMusic
+//
+//  Networking layer talking to the PrismMusic Next.js backend. One class
+//  exposes typed methods for search, recommendations, lyrics, and the
+//  stream-proxy URL builder. Always pulls the current backend host and
+//  Yandex token from `SettingsStore` so changes propagate immediately.
+//
+
+import Foundation
+import Observation
+
+@MainActor
+final class APIClient {
+    private let settings: SettingsStore
+    private let session: URLSession
+    private let decoder: JSONDecoder
+
+    init(settings: SettingsStore) {
+        self.settings = settings
+
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = APIConfig.timeoutSeconds
+        config.timeoutIntervalForResource = APIConfig.timeoutSeconds * 2
+        // Use the URL cache to dedupe identical recommendation / search requests
+        // within a single session — saves a network round-trip on tab switches.
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.urlCache = URLCache(memoryCapacity: 8 * 1024 * 1024, diskCapacity: 32 * 1024 * 1024)
+
+        self.session = URLSession(configuration: config)
+        self.decoder = JSONDecoder()
+    }
+
+    // MARK: - Endpoints
+
+    /// `GET /api/music/search?q=...&token=...`
+    func search(query: String) async throws -> SearchResponse {
+        var components = try makeComponents(path: "/api/music/search")
+        components.queryItems = [URLQueryItem(name: "q", value: query)]
+        if !settings.yandexToken.isEmpty {
+            components.queryItems?.append(URLQueryItem(name: "token", value: settings.yandexToken))
+        }
+        return try await request(components, as: SearchResponse.self)
+    }
+
+    /// `GET /api/music/recommendations`
+    func recommendations() async throws -> RecommendationsResponse {
+        let components = try makeComponents(path: "/api/music/recommendations")
+        return try await request(components, as: RecommendationsResponse.self)
+    }
+
+    /// `GET /api/music/lyrics?artist=...&title=...&id=...&duration=...`
+    func lyrics(artist: String, title: String, id: String? = nil, duration: Double? = nil)
+        async throws -> LyricsResponse?
+    {
+        var components = try makeComponents(path: "/api/music/lyrics")
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "artist", value: artist),
+            URLQueryItem(name: "title", value: title),
+        ]
+        if let id { items.append(URLQueryItem(name: "id", value: id)) }
+        if let duration { items.append(URLQueryItem(name: "duration", value: String(Int(duration.rounded())))) }
+        components.queryItems = items
+
+        // Lyrics endpoint returns 404 when no lyrics exist — treat that as nil.
+        do {
+            return try await request(components, as: LyricsResponse.self)
+        } catch APIError.httpStatus(let code, _) where code == 404 {
+            return nil
+        }
+    }
+
+    /// Builds the proxied stream URL for a given track. AVPlayer hits this
+    /// URL directly; we never download the bytes ourselves.
+    func streamURL(for track: Track) -> URL? {
+        guard let originalURL = track.streamURL else { return nil }
+        guard var components = try? makeComponents(path: "/api/music/stream") else { return nil }
+        var items: [URLQueryItem] = [URLQueryItem(name: "url", value: originalURL.absoluteString)]
+        if track.source == .yandex, !settings.yandexToken.isEmpty {
+            items.append(URLQueryItem(name: "token", value: settings.yandexToken))
+        }
+        components.queryItems = items
+        return components.url
+    }
+
+    // MARK: - Plumbing
+
+    private func makeComponents(path: String) throws -> URLComponents {
+        let trimmed = settings.backendURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let base = URL(string: trimmed),
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else {
+            throw APIError.invalidBackendURL
+        }
+        // Make sure we don't double-slash.
+        if components.path.hasSuffix("/") {
+            components.path.removeLast()
+        }
+        components.path += path
+        return components
+    }
+
+    private func request<T: Decodable>(_ components: URLComponents, as: T.Type) async throws -> T {
+        guard let url = components.url else { throw APIError.invalidBackendURL }
+        var req = URLRequest(url: url)
+        req.cachePolicy = .returnCacheDataElseLoad
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let bodyPreview = String(data: data.prefix(APIConfig.errorBodyLogLimit), encoding: .utf8)
+            throw APIError.httpStatus(http.statusCode, bodyPreview)
+        }
+        return try decoder.decode(T.self, from: data)
+    }
+}
+
+// MARK: - Errors
+
+enum APIError: LocalizedError {
+    case invalidBackendURL
+    case invalidResponse
+    case httpStatus(Int, String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidBackendURL:
+            return "Некорректный URL бэкенда. Проверь Settings."
+        case .invalidResponse:
+            return "Сервер вернул неожиданный ответ."
+        case .httpStatus(let code, _):
+            return "Ошибка сервера (\(code))."
+        }
+    }
+}
