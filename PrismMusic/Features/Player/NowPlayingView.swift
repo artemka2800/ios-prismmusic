@@ -417,7 +417,7 @@ struct NowPlayingView: View {
             .scaleEffect(app.audio.isPlaying ? 1 : 0.94)
             .animation(Theme.Motion.snap, value: app.audio.isPlaying)
 
-            iconButton("forward.fill", size: 28, action: app.audio.next)
+            iconButton("forward.fill", size: 28, action: { app.audio.next() })
 
             iconButton(
                 repeatIcon,

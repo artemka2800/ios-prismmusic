@@ -304,7 +304,7 @@ final class AudioPlayer {
         let targetVolume = isMuted ? 0 : storedVolume
         
         transitionTask = Task { [weak self] in
-            guard let self else { return }
+            guard self != nil else { return }
             
             let crossfadeDuration = 2.0 // 2 seconds crossfade
             let steps = 20

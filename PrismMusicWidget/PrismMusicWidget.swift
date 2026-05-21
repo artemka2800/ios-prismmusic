@@ -91,14 +91,20 @@ struct Provider: TimelineProvider {
             var request = URLRequest(url: url)
             request.timeoutInterval = 2.0 // Short timeout to avoid blocking widget extension process
             
+            final class ImageBox: @unchecked Sendable {
+                var image: UIImage? = nil
+            }
+            let box = ImageBox()
+            
             let task = session.dataTask(with: request) { data, response, error in
                 if let data = data {
-                    artworkImage = UIImage(data: data)
+                    box.image = UIImage(data: data)
                 }
                 semaphore.signal()
             }
             task.resume()
             _ = semaphore.wait(timeout: .now() + 2.0)
+            artworkImage = box.image
         }
         
         return MusicWidgetEntry(
