@@ -22,6 +22,7 @@ import MediaPlayer
 import Observation
 import SwiftUI
 import UIKit
+import WidgetKit
 
 @Observable
 @MainActor
@@ -39,13 +40,25 @@ final class AudioPlayer {
     private(set) var isBuffering: Bool = false
     /// Direction of the last track change — used by the UI to animate cover slides.
     private(set) var trackChangeDirection: TrackChangeDirection = .none
+    private var transitionTask: Task<Void, Never>?
+
+    // Cache properties for Widget Updates to prevent throttling
+    private var lastWidgetTrackId: String? = nil
+    private var lastWidgetIsPlaying: Bool? = nil
+    private var lastWidgetLyricsLines: [String]? = nil
 
     var errorMessage: String? = nil
     var showError: Bool = false
 
     var volume: Float {
-        get { player.volume }
-        set { player.volume = max(0, min(1, newValue)) }
+        get { storedVolume }
+        set {
+            let val = max(0, min(1, newValue))
+            storedVolume = val
+            if !isMuted {
+                player.volume = val
+            }
+        }
     }
     private(set) var isMuted: Bool = false {
         didSet { player.volume = isMuted ? 0 : storedVolume }
@@ -115,6 +128,7 @@ final class AudioPlayer {
             isPlaying = true
         }
         updateNowPlaying()
+        updateWidgetState()
     }
 
     func next() {
@@ -153,6 +167,21 @@ final class AudioPlayer {
             currentIndex = prevIndex
             load(track: queue[prevIndex], autoplay: true)
         }
+    }
+
+    func moveTrack(from source: IndexSet, to destination: Int) {
+        let offset = currentIndex + 1
+        guard offset < queue.count else { return }
+        
+        var newQueue = queue
+        
+        // Map source offsets and destination to actual indices in queue
+        let adjustedSource = IndexSet(source.map { $0 + offset })
+        let adjustedDestination = destination + offset
+        
+        newQueue.move(fromOffsets: adjustedSource, toOffset: adjustedDestination)
+        self.queue = newQueue
+        updateNowPlaying()
     }
 
     func seek(to seconds: Double) {
@@ -197,6 +226,9 @@ final class AudioPlayer {
         isBuffering = true
         lyrics = nil
 
+        // Update widget metadata immediately
+        updateWidgetState(force: true)
+
         // Build the proxied stream URL — this is what AVPlayer fetches.
         guard let url = api.streamURL(for: track) else {
             print("[AudioPlayer] ⚠️ streamURL returned nil for track: \(track.id)")
@@ -211,16 +243,64 @@ final class AudioPlayer {
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
         observePlayerItem(item)
-        player.replaceCurrentItem(with: item)
 
-        if autoplay {
-            player.play()
-            isPlaying = true
+        performAudioTransition { [weak self] in
+            guard let self else { return }
+            self.player.replaceCurrentItem(with: item)
+            if autoplay {
+                self.player.play()
+                self.isPlaying = true
+            }
+            self.updateWidgetState(force: true)
         }
 
         Task { await fetchLyrics(for: track) }
 
         updateNowPlaying()
+    }
+
+    private func performAudioTransition(action: @escaping @MainActor () -> Void) {
+        transitionTask?.cancel()
+        let targetVolume = isMuted ? 0 : storedVolume
+        
+        transitionTask = Task { [weak self] in
+            guard let self else { return }
+            
+            // Phase 1: Fade out volume
+            let fadeOutSteps = 8
+            let fadeOutDuration = 0.12 // 120ms total
+            let fadeOutInterval = fadeOutDuration / Double(fadeOutSteps)
+            
+            let startVolume = player.volume
+            for step in 1...fadeOutSteps {
+                if Task.isCancelled { return }
+                let progress = Float(step) / Float(fadeOutSteps)
+                player.volume = startVolume * (1.0 - progress)
+                try? await Task.sleep(nanoseconds: UInt64(fadeOutInterval * 1_000_000_000))
+            }
+            
+            if Task.isCancelled { return }
+            player.volume = 0
+            
+            // Perform actual track replacement
+            action()
+            
+            // Phase 2: Fade in volume
+            let fadeInSteps = 10
+            let fadeInDuration = 0.20 // 200ms total
+            let fadeInInterval = fadeInDuration / Double(fadeInSteps)
+            
+            for step in 1...fadeInSteps {
+                if Task.isCancelled { return }
+                let progress = Float(step) / Float(fadeInSteps)
+                player.volume = targetVolume * progress
+                try? await Task.sleep(nanoseconds: UInt64(fadeInInterval * 1_000_000_000))
+            }
+            
+            if !Task.isCancelled {
+                player.volume = targetVolume
+            }
+        }
     }
 
     private func observePlayerItem(_ item: AVPlayerItem) {
@@ -269,6 +349,9 @@ final class AudioPlayer {
                 let seconds = time.seconds
                 guard seconds.isFinite else { return }
                 self.progress = seconds
+                
+                self.updateWidgetState()
+                
                 // Refresh Now Playing occasionally
                 if Int(seconds * 4) % 4 == 0 {
                     self.updateNowPlaying()
@@ -340,11 +423,69 @@ final class AudioPlayer {
         )
     }
 
+    // MARK: - Widget State Sync
+
+    func updateWidgetState(force: Bool = false) {
+        let defaults = UserDefaults(suiteName: "group.com.prism.music")
+        
+        let title = currentTrack?.title ?? "Не воспроизводится"
+        let artist = currentTrack?.artist ?? ""
+        let album = currentTrack?.album ?? ""
+        let source = currentTrack?.source?.rawValue ?? ""
+        let isPlaying = self.isPlaying
+        let artworkURL = currentTrack?.artworkURL?.absoluteString ?? ""
+        
+        var lyricsLines: [String] = []
+        if let lyrics = self.lyrics, lyrics.isSynced {
+            let t = self.progress
+            if let activeIndex = lyrics.lines.lastIndex(where: { $0.time <= t }) {
+                for offset in 0..<3 {
+                    let idx = activeIndex + offset
+                    if idx < lyrics.lines.count {
+                        lyricsLines.append(lyrics.lines[idx].text)
+                    }
+                }
+            } else {
+                for idx in 0..<min(3, lyrics.lines.count) {
+                    lyricsLines.append(lyrics.lines[idx].text)
+                }
+            }
+        } else if let lyrics = self.lyrics {
+            for idx in 0..<min(3, lyrics.lines.count) {
+                lyricsLines.append(lyrics.lines[idx].text)
+            }
+        }
+        
+        let trackId = currentTrack?.id
+        if !force &&
+            trackId == lastWidgetTrackId &&
+            isPlaying == lastWidgetIsPlaying &&
+            lyricsLines == lastWidgetLyricsLines {
+            return
+        }
+        
+        lastWidgetTrackId = trackId
+        lastWidgetIsPlaying = isPlaying
+        lastWidgetLyricsLines = lyricsLines
+        
+        defaults?.set(title, forKey: "widget.track.title")
+        defaults?.set(artist, forKey: "widget.track.artist")
+        defaults?.set(album, forKey: "widget.track.album")
+        defaults?.set(source, forKey: "widget.track.source")
+        defaults?.set(isPlaying, forKey: "widget.track.isPlaying")
+        defaults?.set(lyricsLines, forKey: "widget.track.lyricsLines")
+        defaults?.set(artworkURL, forKey: "widget.track.artworkURL")
+        defaults?.synchronize()
+        
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
     // MARK: - Lyrics
 
     private func fetchLyrics(for track: Track) async {
         if let cached = lyricsCache.value(for: track) {
             self.lyrics = cached
+            self.updateWidgetState(force: true)
             return
         }
         do {
@@ -363,6 +504,7 @@ final class AudioPlayer {
             // Only commit if the user hasn't already changed tracks while we waited.
             if currentTrack?.id == track.id {
                 self.lyrics = parsed
+                self.updateWidgetState(force: true)
             }
         } catch {
             // Soft-fail — leave lyrics nil; UI shows "no lyrics" placeholder.

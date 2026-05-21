@@ -108,20 +108,17 @@ struct NowPlayingView: View {
 
     /// Custom transition for cover based on track change direction.
     private var coverTransition: AnyTransition {
-        switch app.audio.trackChangeDirection {
-        case .forward:
-            return .asymmetric(
-                insertion: .move(edge: .trailing).combined(with: .opacity).combined(with: .scale(scale: 0.88)),
-                removal: .move(edge: .leading).combined(with: .opacity).combined(with: .scale(scale: 0.88))
-            )
-        case .backward:
-            return .asymmetric(
-                insertion: .move(edge: .leading).combined(with: .opacity).combined(with: .scale(scale: 0.88)),
-                removal: .move(edge: .trailing).combined(with: .opacity).combined(with: .scale(scale: 0.88))
-            )
-        case .none:
+        let isForward = app.audio.trackChangeDirection == .forward
+        if app.audio.trackChangeDirection == .none {
             return .scale(scale: 0.92).combined(with: .opacity)
         }
+
+        let moveEdge: Edge = isForward ? .trailing : .leading
+        let removeEdge: Edge = isForward ? .leading : .trailing
+        return .asymmetric(
+            insertion: .move(edge: moveEdge).combined(with: .opacity).combined(with: .scale(scale: 0.88)),
+            removal: .move(edge: removeEdge).combined(with: .opacity).combined(with: .scale(scale: 0.88))
+        )
     }
 
     var body: some View {
@@ -223,6 +220,24 @@ struct NowPlayingView: View {
                             .id(app.audio.currentTrack?.id)
                             .transition(coverTransition)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture()
+                                    .onEnded { value in
+                                        let horizontalDistance = value.translation.width
+                                        let verticalDistance = value.translation.height
+                                        
+                                        if verticalDistance > 80 && abs(horizontalDistance) < abs(verticalDistance) {
+                                            isPresented = false
+                                        } else if abs(horizontalDistance) > 60 && abs(verticalDistance) < abs(horizontalDistance) {
+                                            if horizontalDistance < 0 {
+                                                app.audio.next()
+                                            } else {
+                                                app.audio.previous()
+                                            }
+                                        }
+                                    }
+                            )
                         }
                         .transition(.scale.combined(with: .opacity))
                     }
@@ -317,6 +332,15 @@ struct NowPlayingView: View {
             .buttonStyle(GlassCircleButtonStyle())
         }
         .padding(.horizontal, Theme.Layout.screenInset)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    if value.translation.height > 40 && abs(value.translation.width) < abs(value.translation.height) {
+                        isPresented = false
+                    }
+                }
+        )
     }
 
     // MARK: - Track info
@@ -642,37 +666,53 @@ private struct ProgressSlider: View {
 // MARK: - Queue View
 
 private struct QueueView: View {
-    let queue: [Track]
-    let currentIndex: Int
-    let isPlaying: Bool
-    let onSelectTrack: (Int) -> Void
+    @Environment(AppState.self) private var app
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Очередь воспроизведения")
+            Text("Далее")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(Theme.Palette.textPrimary)
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 4) {
-                    ForEach(Array(queue.enumerated()), id: \.offset) { index, track in
-                        let isActive = index == currentIndex
+            let upNextTracks = Array(app.audio.queue.suffix(from: min(app.audio.queue.count, app.audio.currentIndex + 1)))
+
+            if upNextTracks.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("Очередь пуста")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.Palette.textSecondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(Array(upNextTracks.enumerated()), id: \.element.id) { index, track in
+                        let actualQueueIndex = app.audio.currentIndex + 1 + index
                         TrackRowView(
                             track: track,
-                            isPlaying: isActive && isPlaying,
+                            isPlaying: false,
                             onTap: {
-                                onSelectTrack(index)
+                                app.audio.play(queue: app.audio.queue, startAt: actualQueueIndex)
                             }
                         )
-                        .background(isActive ? Color.white.opacity(0.08) : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .padding(.horizontal, 12)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                        .listRowSeparator(.hidden)
+                    }
+                    .onMove { indices, newOffset in
+                        app.audio.moveTrack(from: indices, to: newOffset)
                     }
                 }
-                .padding(.bottom, 24)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .environment(\.editMode, .constant(.active))
             }
         }
     }
 }
+
+

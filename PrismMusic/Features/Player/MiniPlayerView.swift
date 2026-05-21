@@ -62,24 +62,40 @@ struct MiniPlayerView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .prismGlass(cornerRadius: 16)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onExpand()
-        }
-        .overlay(alignment: .bottom) {
-            // Hairline progress indicator at the bottom edge.
+        .background {
             GeometryReader { proxy in
                 let frac = app.audio.duration > 0 ? app.audio.progress / app.audio.duration : 0
-                Rectangle()
-                    .fill(Color.white.opacity(0.6))
-                    .frame(width: max(0, proxy.size.width * frac), height: 2)
+                ZStack(alignment: .leading) {
+                    Color.clear
+                    Rectangle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(width: max(0, proxy.size.width * frac))
+                        .animation(.linear(duration: 0.25), value: frac)
+                }
             }
-            .frame(height: 2)
-            .clipShape(RoundedRectangle(cornerRadius: 1))
-            .padding(.horizontal, 8)
-            .padding(.bottom, 4)
-            .allowsHitTesting(false)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .prismGlass(cornerRadius: 16)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 10)
+                .onEnded { value in
+                    let horizontalDistance = value.translation.width
+                    let verticalDistance = value.translation.height
+                    
+                    if verticalDistance < -35 && abs(horizontalDistance) < abs(verticalDistance) {
+                        onExpand()
+                    } else if abs(horizontalDistance) > 40 && abs(verticalDistance) < abs(horizontalDistance) {
+                        if horizontalDistance < 0 {
+                            app.audio.next()
+                        } else {
+                            app.audio.previous()
+                        }
+                    }
+                }
+        )
+        .onTapGesture {
+            onExpand()
         }
     }
 }
