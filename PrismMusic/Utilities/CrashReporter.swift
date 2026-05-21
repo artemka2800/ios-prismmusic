@@ -1,6 +1,6 @@
 import Foundation
 
-final class CrashReporter {
+final class CrashReporter: @unchecked Sendable {
     static let shared = CrashReporter()
     
     private let crashKey = "LastCrashReport"

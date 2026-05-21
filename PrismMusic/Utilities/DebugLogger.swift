@@ -1,6 +1,6 @@
 import Foundation
 
-final class DebugLogger {
+final class DebugLogger: @unchecked Sendable {
     static let shared = DebugLogger()
     
     private let logPath: String
