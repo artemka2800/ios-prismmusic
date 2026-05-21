@@ -123,3 +123,27 @@ struct LyricsResponse: Decodable, Sendable {
     let lyrics: String?
     let source: String?
 }
+
+/// `GET /api/music/playlist?id=...&source=...` — playlist detail with tracks.
+struct PlaylistDetailResponse: Decodable, Sendable {
+    let id: String?
+    let name: String?
+    let coverUrl: String?
+    let description: String?
+    let tracks: [Track]
+    let source: String?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try? container.decode(String.self, forKey: .id)
+        self.name = try? container.decode(String.self, forKey: .name)
+        self.coverUrl = try? container.decode(String.self, forKey: .coverUrl)
+        self.description = try? container.decode(String.self, forKey: .description)
+        self.tracks = (try? container.decode([Track].self, forKey: .tracks)) ?? []
+        self.source = try? container.decode(String.self, forKey: .source)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, coverUrl, description, tracks, source
+    }
+}

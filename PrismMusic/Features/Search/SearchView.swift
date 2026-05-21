@@ -3,8 +3,8 @@
 //  PrismMusic
 //
 //  Debounced search across all sources (Yandex + SoundCloud). Empty state
-//  shows recent queries (TODO) and suggestions; results render as a flat
-//  list of tracks plus an albums carousel when present.
+//  shows suggestions; results render as a flat list of tracks plus a
+//  compact horizontal carousel of playlist cards when present.
 //
 
 import SwiftUI
@@ -12,6 +12,7 @@ import SwiftUI
 struct SearchView: View {
     @Environment(AppState.self) private var app
     @State private var query: String = ""
+    @State private var loadingPlaylistId: String?
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
@@ -141,24 +142,22 @@ struct SearchView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if !albums.isEmpty {
-                    Text("Альбомы")
+                    Text("Плейлисты")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.Palette.textSecondary)
                         .padding(.horizontal, Theme.Layout.screenInset)
                         .padding(.top, 8)
 
+                    // Compact horizontal scroll — small cards (100pt wide)
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 14) {
+                        LazyHStack(spacing: 12) {
                             ForEach(albums) { album in
-                                AlbumCardView(album: album) {
-                                    if let first = album.tracks?.first {
-                                        app.audio.play(queue: album.tracks ?? [first], startAt: 0)
-                                    }
-                                }
+                                searchPlaylistCard(album)
                             }
                         }
                         .padding(.horizontal, Theme.Layout.screenInset)
                     }
+                    .frame(height: 140)
                 }
 
                 if !tracks.isEmpty {
@@ -183,11 +182,81 @@ struct SearchView: View {
                             )
                         }
                     }
-                    .padding(.horizontal, Theme.Layout.screenInset)
                 }
             }
             .padding(.bottom, 140)
         }
         .scrollIndicators(.hidden)
+    }
+
+    // MARK: - Small playlist card for search results
+
+    private func searchPlaylistCard(_ album: Album) -> some View {
+        Button {
+            openPlaylist(album)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                // Small square cover (100pt)
+                AsyncImage(url: album.cover) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        ZStack {
+                            Color.white.opacity(0.04)
+                            Image(systemName: "music.note")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.white.opacity(0.3))
+                        }
+                    }
+                }
+                .frame(width: 100, height: 100)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    if loadingPlaylistId == album.id {
+                        Color.black.opacity(0.5)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay {
+                                ProgressView().tint(.white)
+                            }
+                    }
+                }
+
+                Text(album.title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .frame(width: 100, alignment: .leading)
+
+                Text(album.artist)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.Palette.textTertiary)
+                    .lineLimit(1)
+                    .frame(width: 100, alignment: .leading)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(loadingPlaylistId != nil)
+    }
+
+    // MARK: - Playlist loading
+
+    private func openPlaylist(_ album: Album) {
+        guard loadingPlaylistId == nil else { return }
+
+        Task {
+            loadingPlaylistId = album.id
+            do {
+                let tracks = try await app.api.playlistTracks(
+                    id: album.id,
+                    source: album.source?.rawValue ?? "soundcloud"
+                )
+                if !tracks.isEmpty {
+                    app.audio.play(queue: tracks, startAt: 0)
+                }
+            } catch {
+                print("[Search] Failed to load playlist \(album.id): \(error)")
+            }
+            loadingPlaylistId = nil
+        }
     }
 }

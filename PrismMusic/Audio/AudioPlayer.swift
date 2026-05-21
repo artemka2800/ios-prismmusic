@@ -187,9 +187,12 @@ final class AudioPlayer {
 
         // Build the proxied stream URL — this is what AVPlayer fetches.
         guard let url = api.streamURL(for: track) else {
+            print("[AudioPlayer] ⚠️ streamURL returned nil for track: \(track.id)")
             isBuffering = false
             return
         }
+        print("[AudioPlayer] ▶ Loading: \(track.title) — \(track.artist)")
+        print("[AudioPlayer]   URL: \(url)")
 
         let asset = AVURLAsset(url: url, options: [
             "AVURLAssetOutOfBandMIMETypeKey": "audio/mpeg",
@@ -218,10 +221,18 @@ final class AudioPlayer {
         statusObserver = item.observe(\.status, options: [.new]) { [weak self] item, _ in
             Task { @MainActor in
                 guard let self else { return }
-                if item.status == .readyToPlay {
+                switch item.status {
+                case .readyToPlay:
                     let d = item.duration.seconds
                     if d.isFinite, d > 0 { self.duration = d }
                     self.isBuffering = false
+                case .failed:
+                    print("[AudioPlayer] ❌ Failed to load: \(item.error?.localizedDescription ?? "unknown")")
+                    self.isBuffering = false
+                    // Auto-skip to next track on failure
+                    self.next()
+                default:
+                    break
                 }
             }
         }

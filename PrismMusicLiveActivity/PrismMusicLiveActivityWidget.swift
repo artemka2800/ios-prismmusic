@@ -2,13 +2,11 @@
 //  PrismMusicLiveActivityWidget.swift
 //  PrismMusicLiveActivity
 //
-//  The single ActivityConfiguration that drives:
-//   - lock-screen / banner Live Activity card
-//   - Dynamic Island compact (small left/right slots)
-//   - Dynamic Island minimal (single-icon when multiple activities are active)
-//   - Dynamic Island expanded (full card when long-pressed)
-//
-//  We render four variants from one source of truth (`LiveActivityState`).
+//  Standard music player Dynamic Island + lock-screen Live Activity.
+//  Compact, clean design matching Apple Music / Spotify conventions:
+//   - Compact: cover art (leading) + waveform/pause icon (trailing)
+//   - Expanded: cover + title/artist + progress bar
+//   - Lock screen: full now-playing card with cover, info, progress
 //
 
 import ActivityKit
@@ -19,44 +17,69 @@ struct PrismMusicLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: LiveActivityAttributes.self) { context in
             // Lock-screen + banner presentation.
-            LockScreenLiveActivityView(state: context.state)
-                .activityBackgroundTint(Color.black.opacity(0.85))
+            LockScreenView(state: context.state)
+                .activityBackgroundTint(.black.opacity(0.85))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
-                // Expanded: rendered when the user long-presses the island.
+                // Expanded regions
                 DynamicIslandExpandedRegion(.leading) {
-                    ExpandedLeading(state: context.state)
-                }
-                DynamicIslandExpandedRegion(.trailing) {
-                    ExpandedTrailing(state: context.state)
+                    CoverArt(url: context.state.artworkURL, size: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    ExpandedCenter(state: context.state)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(context.state.title.isEmpty ? "PrismMusic" : context.state.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Text(context.state.artist)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    Text(context.state.remainingLabel)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .monospacedDigit()
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ExpandedBottom(state: context.state)
+                    ProgressStrip(fraction: context.state.fraction)
+                        .frame(height: 3)
+                        .padding(.top, 4)
                 }
             } compactLeading: {
-                CompactLeading(state: context.state)
+                // Small cover art
+                CoverArt(url: context.state.artworkURL, size: 24)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             } compactTrailing: {
-                CompactTrailing(state: context.state)
+                // Waveform (playing) or pause icon
+                Image(systemName: context.state.isPlaying ? "waveform" : "pause.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .symbolEffect(.variableColor.iterative, options: .repeating, isActive: context.state.isPlaying)
             } minimal: {
-                MinimalView(state: context.state)
+                // Single icon when multiple activities
+                Image(systemName: context.state.isPlaying ? "music.note" : "pause.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
             }
-            .keylineTint(.white)
+            .keylineTint(.white.opacity(0.3))
         }
     }
 }
 
 // MARK: - Lock-screen card
 
-private struct LockScreenLiveActivityView: View {
+private struct LockScreenView: View {
     let state: LiveActivityState
 
     var body: some View {
         HStack(spacing: 12) {
-            Artwork(url: state.artworkURL, size: 60)
+            CoverArt(url: state.artworkURL, size: 56)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
@@ -66,163 +89,73 @@ private struct LockScreenLiveActivityView: View {
                     .lineLimit(1)
                 Text(state.artist)
                     .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.65))
+                    .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
 
-                ProgressBar(fraction: state.fraction)
+                ProgressStrip(fraction: state.fraction)
                     .frame(height: 3)
                     .padding(.top, 4)
             }
 
-            Spacer()
+            Spacer(minLength: 4)
 
             Image(systemName: state.isPlaying ? "waveform" : "pause.fill")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .symbolEffect(.variableColor.iterative, options: .repeating, isActive: state.isPlaying)
-                .frame(width: 36, height: 36)
+                .frame(width: 32, height: 32)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.vertical, 14)
     }
 }
 
-// MARK: - Dynamic Island — compact
+// MARK: - Shared components
 
-private struct CompactLeading: View {
-    let state: LiveActivityState
-
-    var body: some View {
-        Artwork(url: state.artworkURL, size: 22)
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-    }
-}
-
-private struct CompactTrailing: View {
-    let state: LiveActivityState
-
-    /// Two-character glyph that conveys playback state at a glance:
-    /// playing → animated waveform; paused → pause glyph.
-    var body: some View {
-        Image(systemName: state.isPlaying ? "waveform" : "pause.fill")
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(.white)
-            .symbolEffect(.variableColor.iterative, options: .repeating, isActive: state.isPlaying)
-    }
-}
-
-private struct MinimalView: View {
-    let state: LiveActivityState
-
-    var body: some View {
-        Image(systemName: state.isPlaying ? "music.note" : "pause.fill")
-            .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(.white)
-    }
-}
-
-// MARK: - Dynamic Island — expanded
-
-private struct ExpandedLeading: View {
-    let state: LiveActivityState
-
-    var body: some View {
-        Artwork(url: state.artworkURL, size: 50)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-}
-
-private struct ExpandedTrailing: View {
-    let state: LiveActivityState
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Text(state.remainingLabel)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.65))
-                .monospacedDigit()
-            Image(systemName: state.isPlaying ? "waveform" : "pause.fill")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .symbolEffect(.variableColor.iterative, options: .repeating, isActive: state.isPlaying)
-        }
-    }
-}
-
-private struct ExpandedCenter: View {
-    let state: LiveActivityState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(state.title.isEmpty ? "PrismMusic" : state.title)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-            Text(state.artist)
-                .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.65))
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct ExpandedBottom: View {
-    let state: LiveActivityState
-
-    var body: some View {
-        ProgressBar(fraction: state.fraction)
-            .frame(height: 3)
-            .padding(.top, 6)
-    }
-}
-
-// MARK: - Shared subviews
-
-private struct Artwork: View {
+private struct CoverArt: View {
     let url: URL?
     let size: CGFloat
 
     var body: some View {
-        ZStack {
+        Group {
             if let url {
                 AsyncImage(url: url) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFill()
                     } else {
-                        fallback
+                        placeholder
                     }
                 }
             } else {
-                fallback
+                placeholder
             }
         }
         .frame(width: size, height: size)
     }
 
-    private var fallback: some View {
+    private var placeholder: some View {
         ZStack {
             LinearGradient(
-                colors: [.white.opacity(0.18), .white.opacity(0.04)],
+                colors: [.white.opacity(0.15), .white.opacity(0.03)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             Image(systemName: "music.note")
-                .font(.system(size: size * 0.5, weight: .medium))
-                .foregroundStyle(.white.opacity(0.6))
+                .font(.system(size: size * 0.45, weight: .medium))
+                .foregroundStyle(.white.opacity(0.5))
         }
     }
 }
 
-private struct ProgressBar: View {
+private struct ProgressStrip: View {
     let fraction: Double
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.18))
+                Capsule().fill(Color.white.opacity(0.15))
                 Capsule()
-                    .fill(Color.white)
+                    .fill(Color.white.opacity(0.8))
                     .frame(width: max(0, proxy.size.width * fraction))
             }
         }

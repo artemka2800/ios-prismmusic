@@ -90,6 +90,17 @@ final class APIClient {
         return components.url
     }
 
+    /// `GET /api/music/playlist?id=...&source=...` — fetches tracks for a playlist/album.
+    func playlistTracks(id: String, source: String) async throws -> [Track] {
+        var components = try makeComponents(path: "/api/music/playlist")
+        components.queryItems = [
+            URLQueryItem(name: "id", value: id),
+            URLQueryItem(name: "source", value: source),
+        ]
+        let response = try await request(components, as: PlaylistDetailResponse.self)
+        return response.tracks
+    }
+
     // MARK: - Plumbing
 
     private func makeComponents(path: String) throws -> URLComponents {
