@@ -53,8 +53,6 @@ targets:
           UIImageName: ""
         UIBackgroundModes:
           - audio
-        NSSupportsLiveActivities: true
-        NSSupportsLiveActivitiesFrequentUpdates: true
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
@@ -75,28 +73,3 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-    dependencies:
-      - target: PrismMusicLiveActivity
-
-  PrismMusicLiveActivity:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: PrismMusicLiveActivity
-      # Shared attribute file — both targets need to compile the same
-      # `LiveActivityAttributes` type so ActivityKit can match the
-      # widget's configuration to the app's `Activity.request` calls.
-      - path: PrismMusic/LiveActivity/LiveActivityState.swift
-    info:
-      path: PrismMusicLiveActivity/Info.plist
-      properties:
-        CFBundleDisplayName: PrismMusic Live Activity
-        CFBundleShortVersionString: "$(MARKETING_VERSION)"
-        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.prism.music.app.LiveActivity
-        TARGETED_DEVICE_FAMILY: "1,2"
-        SKIP_INSTALL: YES

@@ -35,6 +35,9 @@ final class AudioPlayer {
     private(set) var duration: Double = 0
     private(set) var isBuffering: Bool = false
 
+    var errorMessage: String? = nil
+    var showError: Bool = false
+
     var volume: Float {
         get { player.volume }
         set { player.volume = max(0, min(1, newValue)) }
@@ -58,7 +61,6 @@ final class AudioPlayer {
     private let player = AVPlayer()
     private let session = AudioSessionManager()
     private let nowPlaying = NowPlayingManager()
-    private let liveActivity = LiveActivityManager()
     private let lyricsCache = LyricsCache()
 
     private var timeObserver: Any?
@@ -107,7 +109,6 @@ final class AudioPlayer {
             isPlaying = true
         }
         updateNowPlaying()
-        liveActivity.update(state: liveActivityState)
     }
 
     func next() {
@@ -120,7 +121,6 @@ final class AudioPlayer {
                 // End of queue, no repeat — stop playback gracefully.
                 player.pause()
                 isPlaying = false
-                liveActivity.end()
                 return
             }
             nextIndex = 0
@@ -188,7 +188,9 @@ final class AudioPlayer {
         // Build the proxied stream URL — this is what AVPlayer fetches.
         guard let url = api.streamURL(for: track) else {
             print("[AudioPlayer] ⚠️ streamURL returned nil for track: \(track.id)")
-            isBuffering = false
+            self.errorMessage = "Не удалось получить URL для трека \(track.title)."
+            self.showError = true
+            self.isBuffering = false
             return
         }
         print("[AudioPlayer] ▶ Loading: \(track.title) — \(track.artist)")
@@ -206,12 +208,9 @@ final class AudioPlayer {
             isPlaying = true
         }
 
-        // Kick off lyrics fetch in parallel — pre-populates the cache so
-        // the Now Playing view doesn't show a spinner when opened.
         Task { await fetchLyrics(for: track) }
 
         updateNowPlaying()
-        liveActivity.start(track: track, state: liveActivityState)
     }
 
     private func observePlayerItem(_ item: AVPlayerItem) {
@@ -227,7 +226,10 @@ final class AudioPlayer {
                     if d.isFinite, d > 0 { self.duration = d }
                     self.isBuffering = false
                 case .failed:
-                    print("[AudioPlayer] ❌ Failed to load: \(item.error?.localizedDescription ?? "unknown")")
+                    let msg = item.error?.localizedDescription ?? "Неизвестная ошибка"
+                    print("[AudioPlayer] ❌ Failed to load: \(msg)")
+                    self.errorMessage = "Ошибка воспроизведения: \(msg)"
+                    self.showError = true
                     self.isBuffering = false
                     // Auto-skip to next track on failure
                     self.next()
@@ -257,9 +259,8 @@ final class AudioPlayer {
                 let seconds = time.seconds
                 guard seconds.isFinite else { return }
                 self.progress = seconds
-                // Refresh Live Activity occasionally — every ~1s is enough.
+                // Refresh Now Playing occasionally
                 if Int(seconds * 4) % 4 == 0 {
-                    self.liveActivity.update(state: self.liveActivityState)
                     self.updateNowPlaying()
                 }
             }
@@ -358,16 +359,4 @@ final class AudioPlayer {
         }
     }
 
-    // MARK: - Live Activity payload
-
-    private var liveActivityState: LiveActivityState {
-        LiveActivityState(
-            title: currentTrack?.title ?? "",
-            artist: currentTrack?.artist ?? "",
-            artworkURL: currentTrack?.artworkURL,
-            isPlaying: isPlaying,
-            progress: progress,
-            duration: duration
-        )
-    }
 }

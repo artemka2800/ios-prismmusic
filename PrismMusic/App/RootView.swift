@@ -38,6 +38,14 @@ struct RootView: View {
             NowPlayingView(isPresented: $nowPlayingPresented)
                 .environment(app)
         }
+        .alert(
+            "Ошибка воспроизведения",
+            isPresented: Bindable(app.audio).showError
+        ) {
+            Button("ОК", role: .cancel) { }
+        } message: {
+            Text(app.audio.errorMessage ?? "Неизвестная ошибка")
+        }
     }
 }
 
