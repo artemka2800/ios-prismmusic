@@ -23,7 +23,7 @@ struct Track: Identifiable, Hashable, Codable, Sendable {
     /// Provider tag used by the backend (`yandex`, `soundcloud`, etc).
     let source: TrackSource?
 
-    var artworkURL: URL? { cover }
+    var artworkURL: URL? { proxyArtworkURL(cover) }
 
     /// Convenience: human-readable duration string (`m:ss`).
     var durationLabel: String {
@@ -132,4 +132,25 @@ struct Album: Identifiable, Hashable, Codable, Sendable {
     let cover: URL?
     let source: TrackSource?
     let tracks: [Track]?
+
+    var artworkURL: URL? { proxyArtworkURL(cover) }
+}
+
+/// Helper function to proxy SoundCloud artwork URLs through our Next.js backend.
+func proxyArtworkURL(_ originalURL: URL?) -> URL? {
+    guard let originalURL = originalURL else { return nil }
+    let urlString = originalURL.absoluteString
+    if urlString.contains("sndcdn.com") {
+        let stored = UserDefaults.standard.string(forKey: "prism.backendURL") ?? ""
+        let backend = stored.isEmpty ? "https://prism-music-virid.vercel.app" : stored
+        var cleanBackend = backend.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleanBackend.hasSuffix("/") {
+            cleanBackend.removeLast()
+        }
+        if let encodedUrl = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+           let proxied = URL(string: "\(cleanBackend)/api/music/artwork?url=\(encodedUrl)") {
+            return proxied
+        }
+    }
+    return originalURL
 }

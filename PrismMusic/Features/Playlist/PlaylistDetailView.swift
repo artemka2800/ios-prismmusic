@@ -21,7 +21,7 @@ struct PlaylistDetailView: View {
     var body: some View {
         ZStack {
             // Immersive background matching NowPlayingView style
-            Backdrop(coverURL: album.cover)
+            Backdrop(coverURL: album.artworkURL)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -79,7 +79,7 @@ struct PlaylistDetailView: View {
     private var header: some View {
         VStack(spacing: 16) {
             // Album cover image
-            AsyncImage(url: album.cover) { phase in
+            AsyncImage(url: album.artworkURL) { phase in
                 if let image = phase.image {
                     image
                         .resizable()

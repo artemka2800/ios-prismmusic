@@ -196,7 +196,7 @@ struct SearchView: View {
         NavigationLink(destination: PlaylistDetailView(album: album)) {
             VStack(alignment: .leading, spacing: 6) {
                 // Small square cover (100pt)
-                AsyncImage(url: album.cover) { phase in
+                AsyncImage(url: album.artworkURL) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFill()
                     } else {

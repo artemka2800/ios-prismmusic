@@ -133,7 +133,7 @@ final class AudioPlayer {
         updateWidgetState()
     }
 
-    func next() {
+    func next(isAutomatic: Bool = false) {
         guard !queue.isEmpty else { return }
         let nextIndex: Int
         if isShuffled {
@@ -152,7 +152,7 @@ final class AudioPlayer {
         withAnimation(.spring(response: 0.52, dampingFraction: 0.85)) {
             trackChangeDirection = .forward
             currentIndex = nextIndex
-            load(track: queue[nextIndex], autoplay: true)
+            load(track: queue[nextIndex], autoplay: true, isAutomatic: isAutomatic)
         }
     }
 
@@ -221,7 +221,7 @@ final class AudioPlayer {
 
     // MARK: - Load track
 
-    private func load(track: Track, autoplay: Bool) {
+    private func load(track: Track, autoplay: Bool, isAutomatic: Bool = false) {
         currentTrack = track
         progress = 0
         duration = track.durationSeconds ?? 0
@@ -268,15 +268,31 @@ final class AudioPlayer {
         newPlayer.replaceCurrentItem(with: item)
         attachEndNotification()
         
-        newPlayer.volume = 0
-        if autoplay {
-            newPlayer.play()
-            self.isPlaying = true
+        let targetVolume = isMuted ? 0 : storedVolume
+        
+        if isAutomatic {
+            newPlayer.volume = 0
+            if autoplay {
+                newPlayer.play()
+                self.isPlaying = true
+            }
+            self.updateWidgetState(force: true)
+            performCrossfade(oldPlayer: oldPlayer, newPlayer: newPlayer)
+        } else {
+            // Cancel transition first
+            transitionTask?.cancel()
+            
+            // Instantly stop and unload old player to avoid sound overlap
+            oldPlayer.pause()
+            oldPlayer.replaceCurrentItem(with: nil)
+            
+            newPlayer.volume = targetVolume
+            if autoplay {
+                newPlayer.play()
+                self.isPlaying = true
+            }
+            self.updateWidgetState(force: true)
         }
-        
-        self.updateWidgetState(force: true)
-        
-        performCrossfade(oldPlayer: oldPlayer, newPlayer: newPlayer)
 
         Task { await fetchLyrics(for: track) }
 
@@ -380,7 +396,7 @@ final class AudioPlayer {
                 let remaining = self.duration - seconds
                 if remaining > 0 && remaining <= 3.0 && !self.hasTriggeredAutoNext && self.repeatMode != .one && self.hasNextTrack && self.duration > 10 {
                     self.hasTriggeredAutoNext = true
-                    self.next()
+                    self.next(isAutomatic: true)
                 }
                 
                 // Only trigger widget updates in the time observer if the active lyric line changes
@@ -418,7 +434,7 @@ final class AudioPlayer {
                     self.seek(to: 0)
                     self.player.play()
                 default:
-                    self.next()
+                    self.next(isAutomatic: true)
                 }
             }
         }

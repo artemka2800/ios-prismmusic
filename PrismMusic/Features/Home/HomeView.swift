@@ -246,7 +246,7 @@ struct AlbumCardView: View {
 
     @ViewBuilder
     private var coverImage: some View {
-        AsyncImage(url: album.cover) { phase in
+        AsyncImage(url: album.artworkURL) { phase in
             if let image = phase.image {
                 image.resizable()
                     .scaledToFill()
