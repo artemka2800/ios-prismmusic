@@ -196,9 +196,7 @@ final class AudioPlayer {
         print("[AudioPlayer] ▶ Loading: \(track.title) — \(track.artist)")
         print("[AudioPlayer]   URL: \(url)")
 
-        let asset = AVURLAsset(url: url, options: [
-            "AVURLAssetOutOfBandMIMETypeKey": "audio/mpeg",
-        ])
+        let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
         observePlayerItem(item)
         player.replaceCurrentItem(with: item)
