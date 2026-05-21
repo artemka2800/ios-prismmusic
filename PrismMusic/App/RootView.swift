@@ -87,17 +87,20 @@ private struct ImmersiveBackground: View {
                             .saturation(1.2)
                             // Subtle slow drift so the background feels alive.
                             .scaleEffect(1.15)
-                            .animation(.easeInOut(duration: 0.8), value: url)
                     }
                 }
+                .id(url)
+                .transition(.opacity)
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                 .clipped()
+                
                 // Vignette + dark gradient overlay to keep foreground readable.
                 LinearGradient(
                     colors: [.black.opacity(0.55), .black.opacity(0.85)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .transition(.opacity)
             } else {
                 LinearGradient(
                     colors: [
@@ -107,7 +110,10 @@ private struct ImmersiveBackground: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.8), value: app.audio.currentTrack?.artworkURL)
+        .animation(.easeInOut(duration: 0.8), value: app.settings.immersiveMode)
     }
 }

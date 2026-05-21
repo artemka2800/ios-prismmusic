@@ -76,7 +76,7 @@ final class AudioPlayer {
 
     private let api: APIClient
     private let library: LibraryStore
-    private let player = AVPlayer()
+    private var player = AVPlayer()
     private let session = AudioSessionManager()
     private let nowPlaying = NowPlayingManager()
     private let lyricsCache = LyricsCache()
@@ -242,63 +242,77 @@ final class AudioPlayer {
 
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
-        observePlayerItem(item)
-
-        performAudioTransition { [weak self] in
-            guard let self else { return }
-            self.player.replaceCurrentItem(with: item)
-            if autoplay {
-                self.player.play()
-                self.isPlaying = true
-            }
-            self.updateWidgetState(force: true)
+        
+        let oldPlayer = self.player
+        let newPlayer = AVPlayer()
+        self.player = newPlayer
+        
+        // Remove old observers
+        if let timeObserver {
+            oldPlayer.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
         }
+        statusObserver?.invalidate()
+        bufferObserver?.invalidate()
+        if let endNotificationObserver {
+            NotificationCenter.default.removeObserver(endNotificationObserver)
+            self.endNotificationObserver = nil
+        }
+        
+        observePlayerItem(item)
+        attachTimeObserver()
+        newPlayer.replaceCurrentItem(with: item)
+        attachEndNotification()
+        
+        newPlayer.volume = 0
+        if autoplay {
+            newPlayer.play()
+            self.isPlaying = true
+        }
+        
+        self.updateWidgetState(force: true)
+        
+        performCrossfade(oldPlayer: oldPlayer, newPlayer: newPlayer)
 
         Task { await fetchLyrics(for: track) }
 
         updateNowPlaying()
     }
 
-    private func performAudioTransition(action: @escaping @MainActor () -> Void) {
+    private func performCrossfade(oldPlayer: AVPlayer, newPlayer: AVPlayer) {
         transitionTask?.cancel()
         let targetVolume = isMuted ? 0 : storedVolume
         
         transitionTask = Task { [weak self] in
             guard let self else { return }
             
-            // Phase 1: Fade out volume
-            let fadeOutSteps = 8
-            let fadeOutDuration = 0.12 // 120ms total
-            let fadeOutInterval = fadeOutDuration / Double(fadeOutSteps)
+            let crossfadeDuration = 2.0 // 2 seconds crossfade
+            let steps = 20
+            let interval = crossfadeDuration / Double(steps)
             
-            let startVolume = player.volume
-            for step in 1...fadeOutSteps {
-                if Task.isCancelled { return }
-                let progress = Float(step) / Float(fadeOutSteps)
-                player.volume = startVolume * (1.0 - progress)
-                try? await Task.sleep(nanoseconds: UInt64(fadeOutInterval * 1_000_000_000))
+            let startVolume = oldPlayer.volume
+            
+            for step in 1...steps {
+                if Task.isCancelled { break }
+                
+                let progress = Float(step) / Float(steps)
+                
+                // Fade out old player
+                oldPlayer.volume = startVolume * (1.0 - progress)
+                
+                // Fade in new player
+                newPlayer.volume = targetVolume * progress
+                
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
             
-            if Task.isCancelled { return }
-            player.volume = 0
+            // Clean up old player
+            oldPlayer.pause()
+            oldPlayer.replaceCurrentItem(with: nil)
             
-            // Perform actual track replacement
-            action()
-            
-            // Phase 2: Fade in volume
-            let fadeInSteps = 10
-            let fadeInDuration = 0.20 // 200ms total
-            let fadeInInterval = fadeInDuration / Double(fadeInSteps)
-            
-            for step in 1...fadeInSteps {
-                if Task.isCancelled { return }
-                let progress = Float(step) / Float(fadeInSteps)
-                player.volume = targetVolume * progress
-                try? await Task.sleep(nanoseconds: UInt64(fadeInInterval * 1_000_000_000))
-            }
-            
+            // Ensure new player has final target volume
             if !Task.isCancelled {
-                player.volume = targetVolume
+                newPlayer.volume = targetVolume
             }
         }
     }
@@ -361,9 +375,14 @@ final class AudioPlayer {
     }
 
     private func attachEndNotification() {
+        if let endNotificationObserver {
+            NotificationCenter.default.removeObserver(endNotificationObserver)
+            self.endNotificationObserver = nil
+        }
+        guard let currentItem = player.currentItem else { return }
         endNotificationObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
-            object: nil,
+            object: currentItem,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in

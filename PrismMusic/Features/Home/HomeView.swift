@@ -34,7 +34,7 @@ struct HomeView: View {
                 .padding(.bottom, 140) // mini-player + tab bar room
             }
             .scrollIndicators(.hidden)
-            .background(Color.clear)
+            .clearHostingBackground()
             .refreshable {
                 await app.recommendations.refresh(client: app.api)
             }
@@ -56,7 +56,11 @@ struct HomeView: View {
 
             // Gradient overlay
             LinearGradient(
-                colors: [.clear, Theme.Palette.background.opacity(0.7), Theme.Palette.background],
+                colors: [
+                    .clear,
+                    app.settings.immersiveMode ? .black.opacity(0.2) : Theme.Palette.background.opacity(0.7),
+                    app.settings.immersiveMode ? .black.opacity(0.5) : Theme.Palette.background
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )

@@ -20,7 +20,7 @@ struct LibraryView: View {
                     list
                 }
             }
-            .background(Color.clear)
+            .clearHostingBackground()
             .navigationBarHidden(true)
         }
     }

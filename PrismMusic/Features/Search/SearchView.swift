@@ -25,7 +25,7 @@ struct SearchView: View {
 
                 content
             }
-            .background(Color.clear)
+            .clearHostingBackground()
             .navigationBarHidden(true)
         }
     }

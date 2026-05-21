@@ -124,7 +124,7 @@ struct SettingsView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color.clear)
+            .clearHostingBackground()
             .navigationTitle("Настройки")
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaPadding(.bottom, app.audio.currentTrack != nil ? 100 : 0)

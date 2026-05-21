@@ -46,6 +46,7 @@ targets:
         optional: true
     dependencies:
       - target: PrismMusicWidget
+        embed: true
     info:
       path: PrismMusic/Info.plist
       properties:
