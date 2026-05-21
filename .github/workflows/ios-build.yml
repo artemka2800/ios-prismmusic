@@ -1,14 +1,11 @@
-name: iOS Build
+name: iOS Build & IPA
 
-# Builds the PrismMusic iOS app and produces an unsigned simulator-compatible
-# `.app` bundle as a downloadable artifact.
+# Builds the PrismMusic iOS app and produces:
+#   1. An unsigned .ipa file (for sideloading via AltStore / Sideloadly / TrollStore)
+#   2. A simulator .app bundle (for testing on Mac)
 #
-# We can't ship a real `.ipa` from CI without an Apple Developer account
-# (signing certificate + provisioning profile must be uploaded as repo
-# secrets). What we DO produce here is enough to:
-#   - verify the project compiles
-#   - install on iOS Simulator (drag-and-drop)
-#   - serve as input for AltStore / Sideloadly resigning on the user's Mac
+# No Apple Developer account is required. The .ipa is unsigned —
+# sign it locally with AltStore, Sideloadly, or your own certificate.
 
 on:
   push:
@@ -17,16 +14,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Cancel a running build when a fresh commit lands.
 concurrency:
   group: ios-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build (Simulator, unsigned)
-    # macos-15 runners come with Xcode 16.x preinstalled which gives us the
-    # iOS 18 SDK while still supporting our iOS 17 deployment target.
+  build-ipa:
+    name: Build IPA (unsigned)
     runs-on: macos-15
     timeout-minutes: 30
 
@@ -40,10 +34,7 @@ jobs:
           xcodebuild -version
           swift --version
 
-      # Locate the Swift project. Two possible layouts:
-      #   (a) repo root IS the iOS project (project.yml at top level)
-      #   (b) the iOS project lives in `IOS-PrismMusic/` (or any other
-      #       single sub-folder containing project.yml)
+      # ── Locate project ────────────────────────────────────────────
       - name: Locate iOS project root
         id: locate_project
         run: |
@@ -54,15 +45,13 @@ jobs:
           fi
           if [ -z "$ROOT" ] || [ ! -f "$ROOT/project.yml" ]; then
             echo "::error::project.yml not found anywhere in the repo."
-            echo "Tree:"
             find . -maxdepth 3 -type f -name '*.yml' -not -path './.git/*'
             exit 1
           fi
           echo "Found iOS project at: $ROOT"
           echo "root=$ROOT" >> "$GITHUB_OUTPUT"
 
-      # XcodeGen turns project.yml into a real .xcodeproj on the fly. Keeps
-      # the repo free of the noisy generated `project.pbxproj` file.
+      # ── XcodeGen ──────────────────────────────────────────────────
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -70,10 +59,101 @@ jobs:
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: xcodegen generate
 
-      # Resolve SPM dependencies once so the build step doesn't have to
-      # network out (we don't currently have any, but this is harmless and
-      # safer for future deps).
+      # ── Resolve SPM deps ──────────────────────────────────────────
       - name: Resolve Swift Package dependencies
+        working-directory: ${{ steps.locate_project.outputs.root }}
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project PrismMusic.xcodeproj \
+            -scheme PrismMusic
+
+      # ── Archive for device (unsigned) ─────────────────────────────
+      - name: Archive for iOS device
+        working-directory: ${{ steps.locate_project.outputs.root }}
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project PrismMusic.xcodeproj \
+            -scheme PrismMusic \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/PrismMusic.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            -quiet
+
+      # ── Create .ipa from archive ─────────────────────────────────
+      # An .ipa is simply a zip with a Payload/ folder containing the .app.
+      # Since we're unsigned, we skip `xcodebuild -exportArchive` (which
+      # requires signing) and build the .ipa manually.
+      - name: Create unsigned IPA
+        working-directory: ${{ steps.locate_project.outputs.root }}
+        run: |
+          ARCHIVE_APP="build/PrismMusic.xcarchive/Products/Applications/PrismMusic.app"
+          if [ ! -d "$ARCHIVE_APP" ]; then
+            echo "::error::PrismMusic.app not found in archive."
+            echo "Archive contents:"
+            find build/PrismMusic.xcarchive -type d -name '*.app' || true
+            exit 1
+          fi
+
+          # Build Payload structure
+          mkdir -p build/Payload
+          cp -R "$ARCHIVE_APP" build/Payload/
+
+          # Remove code signature directory (if any leftover)
+          find build/Payload -name "_CodeSignature" -type d -exec rm -rf {} + 2>/dev/null || true
+
+          # Zip into .ipa
+          cd build
+          zip -ry "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa" Payload/
+          ls -lh "$GITHUB_WORKSPACE/PrismMusic-unsigned.ipa"
+
+          echo "✅ IPA created successfully!"
+
+      # ── Upload IPA artifact ──────────────────────────────────────
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrismMusic-IPA-${{ github.sha }}
+          path: PrismMusic-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+  # ── Simulator build (for verification) ───────────────────────────
+  build-simulator:
+    name: Build (Simulator)
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Locate iOS project root
+        id: locate_project
+        run: |
+          if [ -f project.yml ]; then
+            ROOT="."
+          else
+            ROOT=$(find . -maxdepth 3 -name project.yml -not -path './.git/*' -print -quit | xargs -n1 dirname || true)
+          fi
+          if [ -z "$ROOT" ] || [ ! -f "$ROOT/project.yml" ]; then
+            echo "::error::project.yml not found."
+            exit 1
+          fi
+          echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ${{ steps.locate_project.outputs.root }}
+        run: xcodegen generate
+
+      - name: Resolve dependencies
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
           xcodebuild -resolvePackageDependencies \
@@ -95,33 +175,19 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             -quiet
 
-      # Locate the produced .app bundle so we can upload it. The path
-      # varies between Xcode versions, hence the find.
-      - name: Locate built .app bundle
-        id: locate_app
+      - name: Locate and package .app
         working-directory: ${{ steps.locate_project.outputs.root }}
         run: |
           APP_PATH=$(find build/Build/Products -type d -name 'PrismMusic.app' | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "::error::PrismMusic.app not found in build output."
-            find build -type d -name '*.app' || true
             exit 1
           fi
-          echo "Found app at: $APP_PATH"
-          # Resolve to an absolute path so the next step can move it.
-          ABS_APP_PATH=$(cd "$(dirname "$APP_PATH")" && pwd)/$(basename "$APP_PATH")
-          echo "app_path=$ABS_APP_PATH" >> "$GITHUB_OUTPUT"
-
-      # Zip the .app — GitHub artifact uploader doesn't preserve macOS
-      # bundle metadata otherwise (it would flatten Contents/* directories).
-      - name: Package .app
-        run: |
-          APP_DIR=$(dirname '${{ steps.locate_app.outputs.app_path }}')
+          APP_DIR=$(dirname "$APP_PATH")
           cd "$APP_DIR"
           zip -ry "$GITHUB_WORKSPACE/PrismMusic-Simulator.zip" PrismMusic.app
-          ls -la "$GITHUB_WORKSPACE/PrismMusic-Simulator.zip"
 
-      - name: Upload artifact
+      - name: Upload simulator artifact
         uses: actions/upload-artifact@v4
         with:
           name: PrismMusic-Simulator-${{ github.sha }}
