@@ -71,9 +71,11 @@ final class AudioPlayer {
         self.library = library
     }
 
-    deinit {
-        if let timeObserver { player.removeTimeObserver(timeObserver) }
-    }
+    // No `deinit` cleanup is needed: AudioPlayer is owned by AppState for
+    // the lifetime of the process, and ARC tears down both the AVPlayer
+    // and its time observer atomically when the app exits. Touching
+    // `@MainActor` state from `deinit` would also violate Swift 6's
+    // strict-concurrency rules.
 
     // MARK: - Public API
 
