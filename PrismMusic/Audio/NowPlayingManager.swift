@@ -54,7 +54,7 @@ final class NowPlayingManager {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             guard let image = UIImage(data: data) else { return }
-            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            let artwork = makeMediaArtwork(from: image)
             artworkCache = (url, artwork)
             var updated = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? info
             updated[MPMediaItemPropertyArtwork] = artwork
@@ -63,4 +63,8 @@ final class NowPlayingManager {
             // Soft-fail; lock screen will just show the title/artist.
         }
     }
+}
+
+nonisolated private func makeMediaArtwork(from image: UIImage) -> MPMediaItemArtwork {
+    MPMediaItemArtwork(boundsSize: image.size) { _ in image }
 }

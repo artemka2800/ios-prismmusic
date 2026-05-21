@@ -20,6 +20,12 @@ final class DebugLogger: @unchecked Sendable {
         // Redirect stderr and stdout to our file so we capture print() and internal logs
         freopen(logPath, "a+", stderr)
         freopen(logPath, "a+", stdout)
+        
+        // Disable buffering so logs are written immediately, preventing loss on crash
+        setbuf(stdout, nil)
+        setbuf(stderr, nil)
+        
+        print("--- Debug Logger Started ---")
     }
     
     func readLogs() -> String {
