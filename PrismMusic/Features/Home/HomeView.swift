@@ -13,7 +13,6 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(AppState.self) private var app
-    @State private var loadingPlaylistId: String?
 
     var body: some View {
         NavigationStack {
@@ -172,12 +171,7 @@ struct HomeView: View {
                     spacing: 18
                 ) {
                     ForEach(app.recommendations.albums) { album in
-                        AlbumCardView(
-                            album: album,
-                            isLoading: loadingPlaylistId == album.id
-                        ) {
-                            openPlaylist(album)
-                        }
+                        AlbumCardView(album: album)
                     }
                 }
                 .padding(.horizontal, Theme.Layout.screenInset)
@@ -186,53 +180,25 @@ struct HomeView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Actions
 
-    private func openPlaylist(_ album: Album) {
-        guard loadingPlaylistId == nil else { return } // prevent double-tap
-
-        Task {
-            loadingPlaylistId = album.id
-            do {
-                let tracks = try await app.api.playlistTracks(
-                    id: album.id,
-                    source: album.source?.rawValue ?? "soundcloud"
-                )
-                if !tracks.isEmpty {
-                    app.audio.play(queue: tracks, startAt: 0)
-                }
-            } catch {
-                print("[Home] Failed to load playlist \(album.id): \(error)")
-            }
-            loadingPlaylistId = nil
-        }
-    }
 }
 
 // MARK: - Album card (matches web album-card.tsx)
 
 struct AlbumCardView: View {
     let album: Album
-    var isLoading: Bool = false
-    let onTap: () -> Void
     @State private var isPressed = false
 
     var body: some View {
-        Button(action: onTap) {
+        NavigationLink(destination: PlaylistDetailView(album: album)) {
             VStack(alignment: .leading, spacing: 8) {
                 // Square cover with play overlay
                 ZStack {
                     coverImage
+                        .aspectRatio(1, contentMode: .fill)
+                        .clipped()
 
-                    // Play / loading overlay
-                    if isLoading {
-                        Color.black.opacity(0.5)
-                            .overlay {
-                                ProgressView()
-                                    .tint(.white)
-                                    .controlSize(.regular)
-                            }
-                    } else if isPressed {
+                    if isPressed {
                         Color.black.opacity(0.4)
                             .overlay {
                                 Image(systemName: "play.fill")
@@ -255,22 +221,24 @@ struct AlbumCardView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
+                        .multilineTextAlignment(.leading)
                     Text(album.artist)
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Palette.textSecondary)
                         .lineLimit(1)
+                        .multilineTextAlignment(.leading)
                 }
             }
         }
         .buttonStyle(CardPressStyle(isPressed: $isPressed))
-        .disabled(isLoading)
     }
 
     @ViewBuilder
     private var coverImage: some View {
         AsyncImage(url: album.cover) { phase in
             if let image = phase.image {
-                image.resizable().scaledToFill()
+                image.resizable()
+                    .scaledToFill()
             } else if phase.error != nil {
                 fallbackCover
             } else {
@@ -282,8 +250,6 @@ struct AlbumCardView: View {
                     }
             }
         }
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .clipped()
     }
 
     private var fallbackCover: some View {

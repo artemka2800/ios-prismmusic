@@ -60,7 +60,6 @@ struct PrismMusicLiveActivityWidget: Widget {
                 Image(systemName: context.state.isPlaying ? "waveform" : "pause.fill")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white)
-                    .symbolEffect(.variableColor.iterative, options: .repeating, isActive: context.state.isPlaying)
             } minimal: {
                 // Single icon when multiple activities
                 Image(systemName: context.state.isPlaying ? "music.note" : "pause.fill")
@@ -102,7 +101,6 @@ private struct LockScreenView: View {
             Image(systemName: state.isPlaying ? "waveform" : "pause.fill")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
-                .symbolEffect(.variableColor.iterative, options: .repeating, isActive: state.isPlaying)
                 .frame(width: 32, height: 32)
         }
         .padding(.horizontal, 16)
@@ -140,13 +138,8 @@ private struct ProgressStrip: View {
     let fraction: Double
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.15))
-                Capsule()
-                    .fill(Color.white.opacity(0.8))
-                    .frame(width: max(0, proxy.size.width * fraction))
-            }
-        }
+        ProgressView(value: max(0.0, min(1.0, fraction)))
+            .progressViewStyle(.linear)
+            .tint(Color.white.opacity(0.8))
     }
 }

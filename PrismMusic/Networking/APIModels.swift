@@ -28,7 +28,7 @@ struct SearchResponse: Decodable, Sendable {
                     artist: p.description ?? "SoundCloud",
                     year: nil,
                     cover: p.coverUrl.flatMap { URL(string: $0) },
-                    source: .soundcloud,
+                    source: TrackSource(rawValue: p.source?.lowercased() ?? "soundcloud") ?? .soundcloud,
                     tracks: nil
                 )
             }

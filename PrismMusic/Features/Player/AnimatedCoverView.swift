@@ -45,10 +45,12 @@ struct AnimatedCoverView: View {
                     RoundedRectangle(cornerRadius: size * 0.06, style: .continuous)
                         .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(0.45), radius: 30, y: 16)
+                .shadow(color: .black.opacity(isPlaying ? 0.45 : 0.15), radius: isPlaying ? 30 : 15, y: isPlaying ? 16 : 8)
                 // 1 — looping breath. Driven by `breathScale` which we
                 // animate inside `.onAppear` so it survives view updates.
-                .scaleEffect(breathScale)
+                // We also scale down the cover to 0.85 when paused (Apple Music style).
+                .scaleEffect(breathScale * (isPlaying ? 1.0 : 0.85))
+                .animation(.spring(response: 0.6, dampingFraction: 0.7), value: isPlaying)
                 // 1b — gyroscope parallax. Tilt magnitude limited so the
                 // effect feels alive but not distracting.
                 .rotation3DEffect(

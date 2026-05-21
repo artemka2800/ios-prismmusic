@@ -12,7 +12,6 @@ import SwiftUI
 struct SearchView: View {
     @Environment(AppState.self) private var app
     @State private var query: String = ""
-    @State private var loadingPlaylistId: String?
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
@@ -189,12 +188,8 @@ struct SearchView: View {
         .scrollIndicators(.hidden)
     }
 
-    // MARK: - Small playlist card for search results
-
     private func searchPlaylistCard(_ album: Album) -> some View {
-        Button {
-            openPlaylist(album)
-        } label: {
+        NavigationLink(destination: PlaylistDetailView(album: album)) {
             VStack(alignment: .leading, spacing: 6) {
                 // Small square cover (100pt)
                 AsyncImage(url: album.cover) { phase in
@@ -211,52 +206,23 @@ struct SearchView: View {
                 }
                 .frame(width: 100, height: 100)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    if loadingPlaylistId == album.id {
-                        Color.black.opacity(0.5)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            .overlay {
-                                ProgressView().tint(.white)
-                            }
-                    }
-                }
+                .clipped()
 
                 Text(album.title)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .frame(width: 100, alignment: .leading)
+                    .multilineTextAlignment(.leading)
 
                 Text(album.artist)
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.Palette.textTertiary)
                     .lineLimit(1)
                     .frame(width: 100, alignment: .leading)
+                    .multilineTextAlignment(.leading)
             }
         }
         .buttonStyle(.plain)
-        .disabled(loadingPlaylistId != nil)
-    }
-
-    // MARK: - Playlist loading
-
-    private func openPlaylist(_ album: Album) {
-        guard loadingPlaylistId == nil else { return }
-
-        Task {
-            loadingPlaylistId = album.id
-            do {
-                let tracks = try await app.api.playlistTracks(
-                    id: album.id,
-                    source: album.source?.rawValue ?? "soundcloud"
-                )
-                if !tracks.isEmpty {
-                    app.audio.play(queue: tracks, startAt: 0)
-                }
-            } catch {
-                print("[Search] Failed to load playlist \(album.id): \(error)")
-            }
-            loadingPlaylistId = nil
-        }
     }
 }
