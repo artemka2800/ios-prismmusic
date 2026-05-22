@@ -300,7 +300,8 @@ struct MediumNowPlayingView: View {
             // Right: lyrics
             VStack(alignment: .leading, spacing: 5) {
                 if !entry.lyrics.isEmpty {
-                    ForEach(Array(entry.lyrics.prefix(3).enumerated()), id: \.offset) { idx, line in
+                    ForEach(0..<min(3, entry.lyrics.count), id: \.self) { idx in
+                        let line = entry.lyrics[idx]
                         Text(line)
                             .font(.system(size: 11, weight: idx == 0 ? .semibold : .regular))
                             .foregroundStyle(.white.opacity(idx == 0 ? 1.0 : (idx == 1 ? 0.55 : 0.3)))
