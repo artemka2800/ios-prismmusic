@@ -317,6 +317,18 @@ struct WidgetBackdrop: View {
                     .aspectRatio(contentMode: .fill)
                     .blur(radius: 26)
                     .opacity(0.35)
+            } else {
+                // A beautiful soft radial gradient glow for the placeholder state
+                RadialGradient(
+                    colors: [
+                        Color(red: 0.45, green: 0.2, blue: 0.7).opacity(0.22),
+                        Color(red: 0.15, green: 0.3, blue: 0.7).opacity(0.12),
+                        .clear
+                    ],
+                    center: .topTrailing,
+                    startRadius: 5,
+                    endRadius: 140
+                )
             }
             
             LinearGradient(
@@ -328,18 +340,123 @@ struct WidgetBackdrop: View {
     }
 }
 
+struct SmallWidgetPlaceholderView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            // Glowing app logo/icon representation (Prism style!)
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.65, green: 0.35, blue: 0.95), // Purple
+                                Color(red: 0.25, green: 0.55, blue: 1.0),  // Blue
+                                Color(red: 0.95, green: 0.25, blue: 0.65)  // Pink/Magenta
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 44, height: 44)
+                    .shadow(color: Color(red: 0.65, green: 0.35, blue: 0.95).opacity(0.45), radius: 8)
+                
+                Image(systemName: "music.note")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .padding(.top, 8)
+            
+            Text("Открой меня и\nокунись в мир музыки")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .padding(.horizontal, 8)
+            
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(12)
+    }
+}
+
+struct MediumWidgetPlaceholderView: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            // Left side: Glowing prism logo representation
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.65, green: 0.35, blue: 0.95),
+                                Color(red: 0.25, green: 0.55, blue: 1.0),
+                                Color(red: 0.95, green: 0.25, blue: 0.65)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 64, height: 64)
+                    .shadow(color: Color(red: 0.65, green: 0.35, blue: 0.95).opacity(0.4), radius: 10)
+                
+                Image(systemName: "waveform")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            
+            // Right side: Welcoming text block
+            VStack(alignment: .leading, spacing: 5) {
+                Text("PrismMusic")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                
+                Text("Открой меня и окунись в мир музыки")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(2)
+                    .lineSpacing(2)
+                
+                Text("Ваши треки, плейлисты и тексты песен всегда под рукой.")
+                    .font(.system(size: 9, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 struct MusicWidgetView: View {
     let entry: MusicWidgetEntry
     @Environment(\.widgetFamily) var family
 
+    private var isPlaceholder: Bool {
+        entry.title.isEmpty || entry.title == "Не воспроизводится"
+    }
+
     var body: some View {
         switch family {
         case .systemSmall:
-            SmallWidgetView(entry: entry)
+            if isPlaceholder {
+                SmallWidgetPlaceholderView()
+            } else {
+                SmallWidgetView(entry: entry)
+            }
         case .systemMedium:
-            MediumWidgetView(entry: entry)
+            if isPlaceholder {
+                MediumWidgetPlaceholderView()
+            } else {
+                MediumWidgetView(entry: entry)
+            }
         default:
-            SmallWidgetView(entry: entry)
+            if isPlaceholder {
+                SmallWidgetPlaceholderView()
+            } else {
+                SmallWidgetView(entry: entry)
+            }
         }
     }
 }
