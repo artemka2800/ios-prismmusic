@@ -579,16 +579,11 @@ extension UserDefaults {
         let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
         var components = bundleId.components(separatedBy: ".")
         
-        let suffixesToStrip: Set<String> = [
-            "widget",
-            "prismmusicwidget",
-            "prismmusicwidgetextension",
-            "extension",
-            "app"
-        ]
-        
-        while let lastComponent = components.last?.lowercased(), suffixesToStrip.contains(lastComponent) {
-            components.removeLast()
+        // Robust filtering: Remove any component containing "widget", "extension", or "app",
+        // and also any trailing numeric/hash component added by sideloading tools if it's after the widget.
+        components = components.filter { component in
+            let lower = component.lowercased()
+            return !lower.contains("widget") && !lower.contains("extension") && lower != "app"
         }
         
         let appGroupId = "group." + components.joined(separator: ".")

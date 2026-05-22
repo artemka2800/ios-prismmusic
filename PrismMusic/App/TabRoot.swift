@@ -29,9 +29,21 @@ struct TabRoot: View {
         }
         // iOS 26: tab bar automatically gets Liquid Glass material.
         // `.tabBarMinimizeBehavior` lets it shrink on scroll for immersion.
-        .tabBarMinimizeBehavior(.onScrollDown)
+        .safeTabBarMinimizeBehavior()
         .tint(.white)
     }
 
     enum Tab: Hashable { case home, search, library, settings }
 }
+
+private extension View {
+    @ViewBuilder
+    func safeTabBarMinimizeBehavior() -> some View {
+        if #available(iOS 26.0, *) {
+            self.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            self
+        }
+    }
+}
+

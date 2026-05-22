@@ -9,7 +9,7 @@ name: PrismMusic
 options:
   bundleIdPrefix: com.prism.music
   deploymentTarget:
-    iOS: "26.0"            # Requires iOS 26+ for native Liquid Glass `.glassEffect()`.
+    iOS: "17.0"            # Requires iOS 26+ for native Liquid Glass `.glassEffect()`.
   createIntermediateGroups: true
   defaultConfig: Debug
   groupSortPosition: top

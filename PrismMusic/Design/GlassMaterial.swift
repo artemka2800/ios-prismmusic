@@ -19,22 +19,40 @@ extension View {
     ///                   cover colour).
     @ViewBuilder
     func prismGlass(cornerRadius: CGFloat? = nil, tint: Color? = nil) -> some View {
-        if let radius = cornerRadius {
-            self.glassEffect(.regular.tint(tint ?? .clear),
-                             in: .rect(cornerRadius: radius))
+        if #available(iOS 26.0, *) {
+            if let radius = cornerRadius {
+                self.glassEffect(.regular.tint(tint ?? .clear),
+                                 in: .rect(cornerRadius: radius))
+            } else {
+                self.glassEffect(.regular.tint(tint ?? .clear),
+                                 in: .rect)
+            }
         } else {
-            self.glassEffect(.regular.tint(tint ?? .clear),
-                             in: .rect)
+            if let radius = cornerRadius {
+                self.background(.thinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            } else {
+                self.background(.thinMaterial)
+            }
         }
     }
 
     /// Applies Liquid Glass with a circular shape — for round buttons, avatars, etc.
+    @ViewBuilder
     func prismGlassCircle(tint: Color? = nil) -> some View {
-        self.glassEffect(.regular.tint(tint ?? .clear), in: .circle)
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular.tint(tint ?? .clear), in: .circle)
+        } else {
+            self.background(.thinMaterial, in: Circle())
+        }
     }
 
     /// Applies Liquid Glass with a capsule shape — for pills, chips, search fields.
+    @ViewBuilder
     func prismGlassCapsule(tint: Color? = nil) -> some View {
-        self.glassEffect(.regular.tint(tint ?? .clear), in: .capsule)
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular.tint(tint ?? .clear), in: .capsule)
+        } else {
+            self.background(.thinMaterial, in: Capsule())
+        }
     }
 }
