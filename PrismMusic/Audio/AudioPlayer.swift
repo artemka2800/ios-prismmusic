@@ -576,19 +576,9 @@ final class AudioPlayer {
 
 extension UserDefaults {
     static var appGroup: UserDefaults? {
-        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
-        var components = bundleId.components(separatedBy: ".")
-        
-        // Robust filtering: Remove any component containing "widget", "extension", or "app",
-        // and also any trailing numeric/hash component added by sideloading tools if it's after the widget.
-        components = components.filter { component in
-            let lower = component.lowercased()
-            return !lower.contains("widget") && !lower.contains("extension") && lower != "app"
-        }
-        
-        let appGroupId = "group." + components.joined(separator: ".")
-        return UserDefaults(suiteName: appGroupId)
+        // Hardcoded App Group ID — must match the entitlements and the widget.
+        // Falls back to .standard if the group container is unavailable
+        // (e.g., free Apple ID without App Groups provisioning).
+        UserDefaults(suiteName: "group.com.prism.music") ?? .standard
     }
 }
-
-

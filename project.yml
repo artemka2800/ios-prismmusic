@@ -83,8 +83,6 @@ targets:
   PrismMusicWidget:
     type: app-extension
     platform: iOS
-    entitlements:
-      path: PrismMusicWidget/PrismMusicWidget.entitlements
     sources:
       - path: PrismMusicWidget
         excludes:
