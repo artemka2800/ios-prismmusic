@@ -75,7 +75,7 @@ targets:
           NSAllowsArbitraryLoads: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.prism.music.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.prism.music
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -99,7 +99,7 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.prism.music.app.prismmusicwidget
+        PRODUCT_BUNDLE_IDENTIFIER: com.prism.music.prismmusicwidget
         TARGETED_DEVICE_FAMILY: "1,2"
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES

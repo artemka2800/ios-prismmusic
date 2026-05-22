@@ -577,9 +577,9 @@ final class AudioPlayer {
 extension UserDefaults {
     static var appGroup: UserDefaults? {
         // Dynamically compute the App Group suite name from the host app bundle ID.
-        // During sideloading, tools like Sideloadly modify the bundle ID (e.g. to com.sideloadly.prism.music.app),
+        // During sideloading, tools like Sideloadly modify the bundle ID (e.g. to com.sideloadly.prism.music),
         // and also rename the App Group capability to match. Hardcoded IDs would fail to match.
-        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music"
         var components = bundleId.components(separatedBy: ".")
         
         // Remove common target suffixes to get the base identifier

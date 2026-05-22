@@ -11,7 +11,7 @@ import SwiftUI
 
 extension UserDefaults {
     static var appGroup: UserDefaults? {
-        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music"
         var components = bundleId.components(separatedBy: ".")
         if let last = components.last, last.lowercased().contains("widget") || last.lowercased().contains("activity") {
             components.removeLast()
