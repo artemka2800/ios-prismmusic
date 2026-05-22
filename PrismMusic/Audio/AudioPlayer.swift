@@ -576,9 +576,19 @@ final class AudioPlayer {
 
 extension UserDefaults {
     static var appGroup: UserDefaults? {
-        // Hardcoded App Group ID — must match the entitlements and the widget.
-        // Falls back to .standard if the group container is unavailable
-        // (e.g., free Apple ID without App Groups provisioning).
-        UserDefaults(suiteName: "group.com.prism.music") ?? .standard
+        // Dynamically compute the App Group suite name from the host app bundle ID.
+        // During sideloading, tools like Sideloadly modify the bundle ID (e.g. to com.sideloadly.prism.music.app),
+        // and also rename the App Group capability to match. Hardcoded IDs would fail to match.
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
+        var components = bundleId.components(separatedBy: ".")
+        
+        // Remove common target suffixes to get the base identifier
+        if let last = components.last, last.lowercased().contains("widget") || last.lowercased().contains("activity") {
+            components.removeLast()
+        }
+        
+        let baseId = components.joined(separator: ".")
+        let groupName = "group.\(baseId)"
+        return UserDefaults(suiteName: groupName)
     }
 }

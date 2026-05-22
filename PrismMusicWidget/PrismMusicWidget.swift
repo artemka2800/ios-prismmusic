@@ -9,9 +9,20 @@
 import WidgetKit
 import SwiftUI
 
-// MARK: - Shared Constants
+extension UserDefaults {
+    static var appGroup: UserDefaults? {
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music.app"
+        var components = bundleId.components(separatedBy: ".")
+        if let last = components.last, last.lowercased().contains("widget") || last.lowercased().contains("activity") {
+            components.removeLast()
+        }
+        let baseId = components.joined(separator: ".")
+        let groupName = "group.\(baseId)"
+        return UserDefaults(suiteName: groupName)
+    }
+}
 
-private let kGroupID = "group.com.prism.music"
+// MARK: - Shared Constants
 private let kTitle    = "widget.track.title"
 private let kArtist   = "widget.track.artist"
 private let kSource   = "widget.track.source"
@@ -62,7 +73,7 @@ struct PrismProvider: TimelineProvider {
     // Pure synchronous read — no networking, no semaphores, no async.
     private func readEntry() -> PrismEntry {
         // Try the official App Group first, then fall back to standard defaults.
-        let defaults = UserDefaults(suiteName: kGroupID) ?? .standard
+        let defaults = UserDefaults.appGroup ?? .standard
 
         let title    = defaults.string(forKey: kTitle) ?? ""
         let artist   = defaults.string(forKey: kArtist) ?? ""

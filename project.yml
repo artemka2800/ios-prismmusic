@@ -46,7 +46,6 @@ targets:
         optional: true
     dependencies:
       - target: PrismMusicWidget
-        embed: true
     info:
       path: PrismMusic/Info.plist
       properties:
@@ -83,6 +82,9 @@ targets:
   PrismMusicWidget:
     type: app-extension
     platform: iOS
+    subtype: widgetkit-extension
+    entitlements:
+      path: PrismMusicWidget/PrismMusicWidget.entitlements
     sources:
       - path: PrismMusicWidget
         excludes:
