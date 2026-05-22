@@ -43,38 +43,21 @@ struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping @Sendable (MusicWidgetEntry) -> ()) {
-        let entry = readCurrentEntry()
-        completion(entry)
+        Task {
+            let entry = await fetchCurrentEntryAsync()
+            completion(entry)
+        }
     }
 
     func getTimeline(in context: Context, completion: @escaping @Sendable (Timeline<Entry>) -> ()) {
-        let entry = fetchCurrentEntrySync()
-        let timeline = Timeline(entries: [entry], policy: .atEnd)
-        completion(timeline)
+        Task {
+            let entry = await fetchCurrentEntryAsync()
+            let timeline = Timeline(entries: [entry], policy: .atEnd)
+            completion(timeline)
+        }
     }
     
-    private func readCurrentEntry() -> MusicWidgetEntry {
-        let defaults = UserDefaults.appGroup
-        let title = defaults?.string(forKey: "widget.track.title") ?? "Не воспроизводится"
-        let artist = defaults?.string(forKey: "widget.track.artist") ?? ""
-        let album = defaults?.string(forKey: "widget.track.album") ?? ""
-        let source = defaults?.string(forKey: "widget.track.source") ?? ""
-        let isPlaying = defaults?.bool(forKey: "widget.track.isPlaying") ?? false
-        let lyricsLines = defaults?.stringArray(forKey: "widget.track.lyricsLines") ?? []
-        
-        return MusicWidgetEntry(
-            date: Date(),
-            title: title,
-            artist: artist,
-            album: album,
-            source: source,
-            isPlaying: isPlaying,
-            lyricsLines: lyricsLines,
-            artworkImage: nil
-        )
-    }
-    
-    private func fetchCurrentEntrySync() -> MusicWidgetEntry {
+    private func fetchCurrentEntryAsync() async -> MusicWidgetEntry {
         let defaults = UserDefaults.appGroup
         let title = defaults?.string(forKey: "widget.track.title") ?? "Не воспроизводится"
         let artist = defaults?.string(forKey: "widget.track.artist") ?? ""
@@ -86,25 +69,12 @@ struct Provider: TimelineProvider {
         
         var artworkImage: UIImage? = nil
         if let artworkURL = artworkURL, !artworkURL.isEmpty, let url = URL(string: artworkURL) {
-            let semaphore = DispatchSemaphore(value: 0)
-            let session = URLSession.shared
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 2.0 // Short timeout to avoid blocking widget extension process
-            
-            final class ImageBox: @unchecked Sendable {
-                var image: UIImage? = nil
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                artworkImage = UIImage(data: data)
+            } catch {
+                print("Failed to fetch artwork: \(error)")
             }
-            let box = ImageBox()
-            
-            let task = session.dataTask(with: request) { data, response, error in
-                if let data = data {
-                    box.image = UIImage(data: data)
-                }
-                semaphore.signal()
-            }
-            task.resume()
-            _ = semaphore.wait(timeout: .now() + 2.0)
-            artworkImage = box.image
         }
         
         return MusicWidgetEntry(
