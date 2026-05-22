@@ -83,7 +83,6 @@ targets:
   PrismMusicWidget:
     type: app-extension
     platform: iOS
-    subtype: widgetkit-extension
     entitlements:
       path: PrismMusicWidget/PrismMusicWidget.entitlements
     sources:
@@ -100,7 +99,7 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.prism.music.app.PrismMusicWidget
+        PRODUCT_BUNDLE_IDENTIFIER: com.prism.music.app.prismmusicwidget
         TARGETED_DEVICE_FAMILY: "1,2"
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
