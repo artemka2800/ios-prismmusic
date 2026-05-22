@@ -10,7 +10,7 @@
 //   - settings (backend URL, Yandex token, immersive mode)
 //
 //  Wired into the SwiftUI environment by `PrismMusicApp` so any view can
-//  pull it via `@Environment(AppState.self)`.
+//  pull it via `@Environment(AppState.self)`.s
 //
 
 import Foundation
