@@ -20,170 +20,156 @@ struct SettingsView: View {
     @State private var showImportAlert = false
     @State private var importAlertMessage = ""
 
-    enum AuthMode {
-        case login, register
-    }
-    @State private var authMode: AuthMode = .login
-    @State private var usernameDraft: String = ""
-    @State private var passwordDraft: String = ""
-    @State private var isAuthenticating = false
-    @State private var authError: String = ""
-
     var body: some View {
         NavigationStack {
             ZStack {
                 ImmersiveBackground()
                     .ignoresSafeArea()
 
-                Form {
-                    Section {
-                        TextField("https://prism.example.com", text: $backendDraft)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.URL)
-                            .autocorrectionDisabled()
-                            .foregroundStyle(.white)
-                            .tint(.white)
-                    } header: {
-                        Text("Сервер PrismMusic")
-                    } footer: {
-                        Text("URL Next.js-бэкенда. Должен быть доступен с устройства. Для локальной разработки используй IP-адрес твоего Mac в LAN, не localhost.")
-                    }
-
-                    Section {
-                        if app.settings.isLoggedIn {
-                            HStack {
-                                Label("Вы вошли как", systemImage: "person.circle.fill")
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        header
+                        
+                        // Server config card
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Сервер PrismMusic")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.Palette.textSecondary)
+                                .padding(.horizontal, 4)
+                            
+                            VStack(alignment: .leading, spacing: 12) {
+                                TextField("https://prism.example.com", text: $backendDraft)
+                                    .textInputAutocapitalization(.never)
+                                    .keyboardType(.URL)
+                                    .autocorrectionDisabled()
+                                    .padding(12)
+                                    .background(Color.black.opacity(0.2))
+                                    .cornerRadius(10)
                                     .foregroundStyle(.white)
-                                Spacer()
-                                Text(app.settings.username)
-                                    .foregroundStyle(Theme.Palette.textSecondary)
+                                    .tint(.white)
                             }
+                            .padding(14)
+                            .prismGlass(cornerRadius: 16)
                             
-                            Button(role: .destructive) {
-                                withAnimation {
-                                    app.settings.logout()
-                                    usernameDraft = ""
-                                    passwordDraft = ""
-                                }
-                            } label: {
-                                Label("Выйти из аккаунта", systemImage: "arrow.left.circle")
-                                    .foregroundStyle(.red)
-                            }
-                        } else {
-                            Picker("Режим", selection: $authMode) {
-                                Text("Вход").tag(AuthMode.login)
-                                Text("Регистрация").tag(AuthMode.register)
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(.vertical, 4)
-                            
-                            TextField("Имя пользователя", text: $usernameDraft)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .foregroundStyle(.white)
-                                .tint(.white)
-                            
-                            SecureField("Пароль", text: $passwordDraft)
-                                .foregroundStyle(.white)
-                                .tint(.white)
-                            
-                            if !authError.isEmpty {
-                                Text(authError)
-                                    .font(Theme.Typography.secondary)
-                                    .foregroundStyle(.red)
-                            }
-                            
-                            Button {
-                                performAuth()
-                            } label: {
-                                HStack {
-                                    Spacer()
-                                    if isAuthenticating {
-                                        ProgressView()
-                                            .tint(.white)
-                                    } else {
-                                        Text(authMode == .login ? "Войти" : "Зарегистрироваться")
-                                            .fontWeight(.semibold)
-                                            .foregroundStyle(.white)
-                                    }
-                                    Spacer()
-                                }
-                            }
-                            .disabled(usernameDraft.isEmpty || passwordDraft.isEmpty || isAuthenticating)
+                            Text("URL Next.js-бэкенда. Должен быть доступен с устройства. Для локальной разработки используй IP-адрес вашего Mac в LAN, не localhost.")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Palette.textTertiary)
+                                .padding(.horizontal, 4)
                         }
-                    } header: {
-                        Text("Аккаунт PrismMusic")
-                    }
-
-
-                    Section {
-                        SecureField("Введи Yandex.Music token", text: $tokenDraft)
-                            .foregroundStyle(.white)
-                            .tint(.white)
-
-                        Button {
-                            showTokenInfo = true
-                        } label: {
-                            Label("Как получить токен?", systemImage: "questionmark.circle")
-                                .foregroundStyle(.white)
-                        }
-
-                        if !app.settings.yandexToken.isEmpty {
-                            Button {
-                                importYandexLikes()
-                            } label: {
-                                HStack {
-                                    Label("Импортировать любимые треки", systemImage: "arrow.down.circle")
+                        
+                        // Yandex.Music config card
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Yandex.Music")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.Palette.textSecondary)
+                                .padding(.horizontal, 4)
+                            
+                            VStack(alignment: .leading, spacing: 14) {
+                                SecureField("Введи Yandex.Music token", text: $tokenDraft)
+                                    .padding(12)
+                                    .background(Color.black.opacity(0.2))
+                                    .cornerRadius(10)
+                                    .foregroundStyle(.white)
+                                    .tint(.white)
+                                
+                                Button {
+                                    showTokenInfo = true
+                                } label: {
+                                    Label("Как получить токен?", systemImage: "questionmark.circle")
                                         .foregroundStyle(.white)
-                                    Spacer()
-                                    if isImporting {
-                                        ProgressView()
-                                            .tint(.white)
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+                                
+                                if !app.settings.yandexToken.isEmpty {
+                                    Divider()
+                                        .background(Color.white.opacity(0.1))
+                                    
+                                    Button {
+                                        importYandexLikes()
+                                    } label: {
+                                        HStack {
+                                            Label("Импортировать любимые треки", systemImage: "arrow.down.circle")
+                                                .foregroundStyle(.white)
+                                                .font(.system(size: 14, weight: .medium))
+                                            Spacer()
+                                            if isImporting {
+                                                ProgressView()
+                                                    .tint(.white)
+                                            }
+                                        }
                                     }
+                                    .disabled(isImporting)
                                 }
                             }
-                            .disabled(isImporting)
+                            .padding(14)
+                            .prismGlass(cornerRadius: 16)
+                            
+                            Text("Без токена доступен только SoundCloud. Токен хранится в Keychain устройства, бэкенд получает его одноразово в каждом запросе стрима.")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Palette.textTertiary)
+                                .padding(.horizontal, 4)
                         }
-                    } header: {
-                        Text("Yandex.Music")
-                    } footer: {
-                        Text("Без токена доступен только SoundCloud. Токен хранится в Keychain устройства, бэкенд получает его одноразово в каждом запросе стрима.")
-                    }
-
-                    Section {
-                        Toggle(isOn: Binding(
-                            get: { app.settings.immersiveMode },
-                            set: { app.settings.immersiveMode = $0 }
-                        )) {
-                            Label("Immersive фон", systemImage: "sparkles")
-                                .foregroundStyle(.white)
+                        
+                        // UI config card
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Внешний вид")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.Palette.textSecondary)
+                                .padding(.horizontal, 4)
+                            
+                            VStack(alignment: .leading, spacing: 12) {
+                                Toggle(isOn: Binding(
+                                    get: { app.settings.immersiveMode },
+                                    set: { app.settings.immersiveMode = $0 }
+                                )) {
+                                    Label("Immersive фон", systemImage: "sparkles")
+                                        .foregroundStyle(.white)
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+                                .tint(.white)
+                            }
+                            .padding(14)
+                            .prismGlass(cornerRadius: 16)
+                            
+                            Text("Immersive фон подкрашивает фон приложения цветом текущей обложки.")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Palette.textTertiary)
+                                .padding(.horizontal, 4)
                         }
-                        .tint(.white)
-                    } header: {
-                        Text("Внешний вид")
-                    } footer: {
-                        Text("Immersive фон подкрашивает фон приложения цветом текущей обложки.")
-                    }
-
-                    Section {
-                        Button {
-                            logsContent = DebugLogger.shared.readLogs()
-                            showDebugLogs = true
-                        } label: {
-                            Label("Посмотреть логи (Debug)", systemImage: "ladybug")
-                                .foregroundStyle(.white)
+                        
+                        // Debug card
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Отладка")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.Palette.textSecondary)
+                                .padding(.horizontal, 4)
+                            
+                            VStack(alignment: .leading, spacing: 14) {
+                                Button {
+                                    logsContent = DebugLogger.shared.readLogs()
+                                    showDebugLogs = true
+                                } label: {
+                                    Label("Посмотреть логи (Debug)", systemImage: "ladybug")
+                                        .foregroundStyle(.white)
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
+                                
+                                Button {
+                                    DebugLogger.shared.clearLogs()
+                                } label: {
+                                    Label("Очистить логи", systemImage: "trash")
+                                        .foregroundStyle(.red)
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+                            }
+                            .padding(14)
+                            .prismGlass(cornerRadius: 16)
                         }
-                        Button {
-                            DebugLogger.shared.clearLogs()
-                        } label: {
-                            Label("Очистить логи", systemImage: "trash")
-                                .foregroundStyle(.red)
-                        }
-                    } header: {
-                        Text("Отладка")
-                    }
-
-                    Section {
+                        
+                        // Save Button
                         Button {
                             save()
                         } label: {
@@ -193,20 +179,25 @@ struct SettingsView: View {
                                     Label("Сохранено", systemImage: "checkmark.circle.fill")
                                         .foregroundStyle(.green)
                                 } else {
-                                    Text("Сохранить")
+                                    Text("Сохранить настройки")
                                         .fontWeight(.semibold)
                                         .foregroundStyle(.white)
                                 }
                                 Spacer()
                             }
+                            .padding()
+                            .prismGlass(cornerRadius: 16, tint: .white.opacity(0.1))
                         }
                         .disabled(savedFlash)
+                        .padding(.top, 8)
                     }
+                    .padding(.horizontal, Theme.Layout.screenInset)
+                    .padding(.top, 20)
+                    .padding(.bottom, 140)
                 }
-                .scrollContentBackground(.hidden)
+                .scrollIndicators(.hidden)
             }
-            .navigationTitle("Настройки")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(true)
             .safeAreaPadding(.bottom, app.audio.currentTrack != nil ? 100 : 0)
             .alert("Yandex.Music token", isPresented: $showTokenInfo) {
                 Button("OK", role: .cancel) {}
@@ -242,6 +233,18 @@ struct SettingsView: View {
         }
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Настройки")
+                .font(Theme.Typography.largeTitle)
+                .foregroundStyle(.white)
+            Text("Настройки воспроизведения и соединения")
+                .font(Theme.Typography.secondary)
+                .foregroundStyle(Theme.Palette.textSecondary)
+        }
+        .padding(.top, 12)
+    }
+
     private var roleCancelForAlert: ButtonRole? {
         #if os(macOS)
         return nil
@@ -275,59 +278,6 @@ struct SettingsView: View {
         Task {
             try? await Task.sleep(for: .seconds(1.4))
             withAnimation { savedFlash = false }
-        }
-    }
-
-    private func performAuth() {
-        isAuthenticating = true
-        authError = ""
-        
-        Task {
-            do {
-                let response: UserResponse
-                if authMode == .login {
-                    response = try await app.api.login(
-                        username: usernameDraft.trimmingCharacters(in: .whitespacesAndNewlines),
-                        password: passwordDraft
-                    )
-                } else {
-                    response = try await app.api.register(
-                        username: usernameDraft.trimmingCharacters(in: .whitespacesAndNewlines),
-                        password: passwordDraft
-                    )
-                }
-                
-                // Success! Save details
-                app.settings.userId = response.id
-                app.settings.username = response.username
-                if let serverYandexToken = response.token, !serverYandexToken.isEmpty {
-                    app.settings.yandexToken = serverYandexToken
-                    tokenDraft = serverYandexToken
-                }
-                
-                // Clear draft inputs
-                usernameDraft = ""
-                passwordDraft = ""
-                authError = ""
-                
-                // Sync library likes
-                await app.library.syncWithServer()
-                
-            } catch {
-                if case APIError.httpStatus(let code, let preview) = error {
-                    if let preview = preview,
-                       let previewData = preview.data(using: .utf8),
-                       let errObj = try? JSONSerialization.jsonObject(with: previewData) as? [String: Any],
-                       let errMsg = errObj["error"] as? String {
-                        authError = errMsg
-                    } else {
-                        authError = "Неверный логин или пароль (код \(code))"
-                    }
-                } else {
-                    authError = error.localizedDescription
-                }
-            }
-            isAuthenticating = false
         }
     }
 }

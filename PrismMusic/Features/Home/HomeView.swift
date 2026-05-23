@@ -37,6 +37,7 @@ struct HomeView: View {
                     }
                     .padding(.bottom, 140) // mini-player + tab bar room
                 }
+                .ignoresSafeArea(edges: .top)
                 .scrollIndicators(.hidden)
                 .refreshable {
                     await app.recommendations.refresh(client: app.api)
@@ -82,7 +83,7 @@ struct HomeView: View {
             .padding(.horizontal, Theme.Layout.screenInset + 4)
             .padding(.bottom, 20)
         }
-        .frame(height: 200)
+        .frame(height: 240)
         .clipped()
     }
 

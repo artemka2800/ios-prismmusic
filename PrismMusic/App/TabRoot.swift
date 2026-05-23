@@ -23,6 +23,9 @@ struct TabRoot: View {
             LibraryView()
                 .tabItem { Label("Медиатека", systemImage: "rectangle.stack.fill") }
                 .tag(Tab.library)
+            AccountView()
+                .tabItem { Label("Аккаунт", systemImage: "person.crop.circle.fill") }
+                .tag(Tab.account)
             SettingsView()
                 .tabItem { Label("Настройки", systemImage: "gear") }
                 .tag(Tab.settings)
@@ -33,7 +36,7 @@ struct TabRoot: View {
         .tint(.white)
     }
 
-    enum Tab: Hashable { case home, search, library, settings }
+    enum Tab: Hashable { case home, search, library, account, settings }
 }
 
 private extension View {

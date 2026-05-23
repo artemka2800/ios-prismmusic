@@ -65,10 +65,11 @@ struct PlaylistDetailView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .semibold))
                     .frame(width: 38, height: 38)
+                    .foregroundStyle(.white)
             }
             .buttonStyle(GlassCircleButtonStyle())
             .padding(.leading, Theme.Layout.screenInset)
-            .padding(.top, 8)
+            .padding(.top, 55)
         }
         .navigationBarHidden(true)
         .task {
