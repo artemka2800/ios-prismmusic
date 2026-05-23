@@ -99,7 +99,7 @@ final class APIClient {
     }
 
     /// `POST /api/music/yandex/import` — imports Yandex Liked tracks.
-    func importYandexLikes() async throws -> YandexImportResponse {
+    func importYandexLikes(userId: String? = nil) async throws -> YandexImportResponse {
         let components = try makeComponents(path: "/api/music/yandex/import")
         guard let url = components.url else { throw APIError.invalidBackendURL }
         var req = URLRequest(url: url)
@@ -110,7 +110,11 @@ final class APIClient {
         if !settings.yandexToken.isEmpty {
             req.setValue(settings.yandexToken, forHTTPHeaderField: "x-yandex-token")
         }
-        req.httpBody = try JSONSerialization.data(withJSONObject: [:])
+        var body: [String: Any] = [:]
+        if let userId {
+            body["userId"] = userId
+        }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
         
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }

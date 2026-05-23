@@ -560,7 +560,7 @@ final class AudioPlayer {
                 lyricsCache.set(nil, for: track)
                 return
             }
-            let parsed = LyricsParser.parse(raw)
+            let parsed = LyricsParser.parse(raw, duration: track.durationSeconds)
             lyricsCache.set(parsed, for: track)
             // Only commit if the user hasn't already changed tracks while we waited.
             if currentTrack?.id == track.id {

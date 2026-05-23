@@ -180,7 +180,9 @@ private struct LineView: View {
 
     var body: some View {
         Group {
-            if let words = line.words, !words.isEmpty {
+            if line.isPause {
+                AnimatedEllipsisView(isActive: isActive, isPast: isPast)
+            } else if let words = line.words, !words.isEmpty {
                 karaokeText(words: words)
             } else {
                 Text(line.text)
@@ -248,5 +250,72 @@ private struct LineView: View {
     /// Cinematic depth-of-field — far-away inactive lines blur slightly.
     private var blurRadius: Double {
         isActive ? 0 : 0.4
+    }
+}
+
+// MARK: - Animated Ellipsis View for Instrumental Breaks
+
+private struct AnimatedEllipsisView: View {
+    let isActive: Bool
+    let isPast: Bool
+    
+    @State private var dot1 = false
+    @State private var dot2 = false
+    @State private var dot3 = false
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Color.white)
+                .frame(width: 8, height: 8)
+                .scaleEffect(isActive && dot1 ? 1.25 : 0.8)
+                .offset(y: isActive && dot1 ? -6 : 0)
+                .opacity(isPast ? 0.35 : (isActive ? (dot1 ? 1.0 : 0.25) : 0.20))
+            Circle()
+                .fill(Color.white)
+                .frame(width: 8, height: 8)
+                .scaleEffect(isActive && dot2 ? 1.25 : 0.8)
+                .offset(y: isActive && dot2 ? -6 : 0)
+                .opacity(isPast ? 0.35 : (isActive ? (dot2 ? 1.0 : 0.25) : 0.20))
+            Circle()
+                .fill(Color.white)
+                .frame(width: 8, height: 8)
+                .scaleEffect(isActive && dot3 ? 1.25 : 0.8)
+                .offset(y: isActive && dot3 ? -6 : 0)
+                .opacity(isPast ? 0.35 : (isActive ? (dot3 ? 1.0 : 0.25) : 0.20))
+        }
+        .frame(height: 36)
+        .onAppear {
+            if isActive {
+                startAnimation()
+            }
+        }
+        .onChange(of: isActive) { _, newValue in
+            if newValue {
+                startAnimation()
+            } else {
+                stopAnimation()
+            }
+        }
+    }
+    
+    private func startAnimation() {
+        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+            dot1 = true
+        }
+        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true).delay(0.18)) {
+            dot2 = true
+        }
+        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true).delay(0.36)) {
+            dot3 = true
+        }
+    }
+    
+    private func stopAnimation() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            dot1 = false
+            dot2 = false
+            dot3 = false
+        }
     }
 }

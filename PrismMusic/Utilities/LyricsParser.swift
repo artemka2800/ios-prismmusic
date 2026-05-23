@@ -12,7 +12,7 @@
 import Foundation
 
 enum LyricsParser {
-    static func parse(_ raw: String) -> ParsedLyrics {
+    static func parse(_ raw: String, duration: Double? = nil) -> ParsedLyrics {
         // Strip metadata header tags ([ar:Artist], [ti:Title], etc.) but
         // honour the global `[offset:N]` shift (milliseconds).
         let offset = extractOffset(raw)
@@ -75,7 +75,7 @@ enum LyricsParser {
             }
         }
 
-        // Sort by timestamp, then synthesize endTime + word timing where missing.
+        // Sort by time defensively
         var sorted = lines.sorted { $0.time < $1.time }
         for i in sorted.indices {
             let endTime = i + 1 < sorted.count ? sorted[i + 1].time : nil
@@ -91,7 +91,83 @@ enum LyricsParser {
             )
         }
 
-        return ParsedLyrics(lines: sorted)
+        var linesWithPauses: [LyricsLine] = []
+        let pauseThreshold = 4.0
+
+        let syncedLines = sorted.filter { $0.time >= 0 }
+        let unsyncedLines = sorted.filter { $0.time < 0 }
+
+        if !syncedLines.isEmpty {
+            // 1. Intro pause
+            let firstLine = syncedLines[0]
+            if firstLine.time > 5.0 {
+                linesWithPauses.append(LyricsLine(
+                    time: 0,
+                    endTime: firstLine.time - 1.0,
+                    text: "...",
+                    words: nil,
+                    isPause: true
+                ))
+            }
+
+            // 2. Middle pauses
+            for i in 0..<syncedLines.count {
+                let line = syncedLines[i]
+                linesWithPauses.append(line)
+
+                if i + 1 < syncedLines.count {
+                    let nextLine = syncedLines[i + 1]
+                    var singingEndTime = line.time
+                    if let words = line.words, !words.isEmpty {
+                        let lastWord = words[words.count - 1]
+                        let lastWordDur = min(1.5, (line.endTime ?? (lastWord.time + 1.5)) - lastWord.time)
+                        singingEndTime = lastWord.time + lastWordDur
+                    } else {
+                        singingEndTime = line.endTime ?? (line.time + 4.0)
+                    }
+
+                    let gap = nextLine.time - singingEndTime
+                    if gap >= pauseThreshold {
+                        linesWithPauses.append(LyricsLine(
+                            time: singingEndTime + 0.5,
+                            endTime: nextLine.time - 1.0,
+                            text: "...",
+                            words: nil,
+                            isPause: true
+                        ))
+                    }
+                }
+            }
+
+            // 3. Outro pause
+            if let duration = duration, duration > 0 {
+                let lastLine = syncedLines[syncedLines.count - 1]
+                var singingEndTime = lastLine.time
+                if let words = lastLine.words, !words.isEmpty {
+                    let lastWord = words[words.count - 1]
+                    let lastWordDur = min(1.5, (lastLine.endTime ?? (lastWord.time + 1.5)) - lastWord.time)
+                    singingEndTime = lastWord.time + lastWordDur
+                } else {
+                    singingEndTime = lastLine.endTime ?? (lastLine.time + 4.0)
+                }
+
+                if duration - singingEndTime >= 5.0 {
+                    linesWithPauses.append(LyricsLine(
+                        time: singingEndTime + 0.5,
+                        endTime: duration - 1.0,
+                        text: "...",
+                        words: nil,
+                        isPause: true
+                    ))
+                }
+            }
+        } else {
+            linesWithPauses.append(contentsOf: unsyncedLines)
+        }
+
+        // Keep final lines sorted
+        let finalLines = linesWithPauses.sorted { $0.time < $1.time }
+        return ParsedLyrics(lines: finalLines)
     }
 
     // MARK: - Helpers
@@ -203,7 +279,9 @@ enum LyricsParser {
         let gap = end - start
         
         let baseSingingDur = Double(rawWords.count) * 0.45
+        let maxSingingDur = Double(rawWords.count) * 0.55 + 1.2
         let singingGap = min(
+            maxSingingDur,
             gap * 0.75,
             max(gap * 0.4, baseSingingDur)
         )

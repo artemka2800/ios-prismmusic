@@ -21,6 +21,7 @@ struct LyricsLine: Hashable, Identifiable, Sendable {
     let endTime: Double?
     let text: String
     let words: [LyricsWord]?
+    let isPause: Bool
 
     /// Whether this line carries word-level timing.
     var hasWords: Bool { !(words?.isEmpty ?? true) }
@@ -30,6 +31,14 @@ struct LyricsLine: Hashable, Identifiable, Sendable {
     var duration: Double? {
         guard let end = endTime, end > time else { return nil }
         return end - time
+    }
+
+    init(time: Double, endTime: Double?, text: String, words: [LyricsWord]?, isPause: Bool = false) {
+        self.time = time
+        self.endTime = endTime
+        self.text = text
+        self.words = words
+        self.isPause = isPause
     }
 }
 

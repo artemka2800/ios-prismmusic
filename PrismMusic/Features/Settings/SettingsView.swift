@@ -255,9 +255,10 @@ struct SettingsView: View {
 
     private func importYandexLikes() {
         isImporting = true
+        let userId = app.settings.isLoggedIn ? app.settings.userId : nil
         Task {
             do {
-                let response = try await app.api.importYandexLikes()
+                let response = try await app.api.importYandexLikes(userId: userId)
                 let importedTracksCount = app.library.importYandexTracks(response.importedLikes)
                 importAlertMessage = "Успешно импортировано \(importedTracksCount) новых треков из Яндекс.Музыки!"
                 showImportAlert = true
