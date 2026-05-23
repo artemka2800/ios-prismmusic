@@ -121,6 +121,93 @@ final class APIClient {
         return try decoder.decode(YandexImportResponse.self, from: data)
     }
 
+    /// `POST /api/auth/login`
+    func login(username: String, password: String) async throws -> UserResponse {
+        let components = try makeComponents(path: "/api/auth/login")
+        guard let url = components.url else { throw APIError.invalidBackendURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: String] = ["username": username, "password": password]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let bodyPreview = String(data: data.prefix(APIConfig.errorBodyLogLimit), encoding: .utf8)
+            throw APIError.httpStatus(http.statusCode, bodyPreview)
+        }
+        return try decoder.decode(UserResponse.self, from: data)
+    }
+
+    /// `POST /api/auth/register`
+    func register(username: String, password: String) async throws -> UserResponse {
+        let components = try makeComponents(path: "/api/auth/register")
+        guard let url = components.url else { throw APIError.invalidBackendURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: String] = ["username": username, "password": password]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let bodyPreview = String(data: data.prefix(APIConfig.errorBodyLogLimit), encoding: .utf8)
+            throw APIError.httpStatus(http.statusCode, bodyPreview)
+        }
+        return try decoder.decode(UserResponse.self, from: data)
+    }
+
+    /// `GET /api/library/likes`
+    func fetchLikedTracks(userId: String) async throws -> [Track] {
+        var components = try makeComponents(path: "/api/library/likes")
+        components.queryItems = [URLQueryItem(name: "userId", value: userId)]
+        return try await request(components, as: [Track].self)
+    }
+
+    /// `POST /api/library/likes`
+    func toggleLikeOnServer(userId: String, track: Track) async throws -> Bool {
+        let components = try makeComponents(path: "/api/library/likes")
+        guard let url = components.url else { throw APIError.invalidBackendURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let trackDict: [String: Any] = [
+            "id": track.id,
+            "title": track.title,
+            "artist": track.artist,
+            "coverUrl": track.cover?.absoluteString ?? "",
+            "duration": track.duration,
+            "source": track.source?.rawValue ?? "unknown"
+        ]
+        let body: [String: Any] = [
+            "userId": userId,
+            "track": trackDict
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let bodyPreview = String(data: data.prefix(APIConfig.errorBodyLogLimit), encoding: .utf8)
+            throw APIError.httpStatus(http.statusCode, bodyPreview)
+        }
+        
+        struct LikeResponse: Decodable {
+            let liked: Bool
+        }
+        let result = try decoder.decode(LikeResponse.self, from: data)
+        return result.liked
+    }
+
+
     // MARK: - Plumbing
 
     private func makeComponents(path: String) throws -> URLComponents {

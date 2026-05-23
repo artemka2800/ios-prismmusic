@@ -29,7 +29,7 @@ final class AppState {
     init() {
         let settings = SettingsStore()
         let api = APIClient(settings: settings)
-        let library = LibraryStore()
+        let library = LibraryStore(api: api, settings: settings)
         self.settings = settings
         self.api = api
         self.library = library

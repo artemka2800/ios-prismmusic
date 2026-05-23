@@ -152,3 +152,14 @@ struct PlaylistDetailResponse: Decodable, Sendable {
 struct YandexImportResponse: Decodable, Sendable {
     let importedLikes: [Track]
 }
+
+/// `POST /api/auth/login` and `POST /api/auth/register` response.
+struct UserResponse: Codable, Sendable {
+    let id: String
+    let username: String
+    let token: String? // Yandex OAuth token
+    let avatarUrl: String?
+    let role: String?
+    let createdAt: String?
+}
+

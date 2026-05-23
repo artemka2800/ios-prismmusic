@@ -32,6 +32,7 @@ struct PrismMusicApp: App {
                     // remote command handlers, Live Activity recovery.
                     appState.audio.bootstrap()
                     await appState.recommendations.loadIfNeeded(client: appState.api)
+                    await appState.library.syncWithServer()
                 }
         }
     }

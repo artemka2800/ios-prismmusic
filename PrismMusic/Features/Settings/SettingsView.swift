@@ -20,6 +20,15 @@ struct SettingsView: View {
     @State private var showImportAlert = false
     @State private var importAlertMessage = ""
 
+    enum AuthMode {
+        case login, register
+    }
+    @State private var authMode: AuthMode = .login
+    @State private var usernameDraft: String = ""
+    @State private var passwordDraft: String = ""
+    @State private var isAuthenticating = false
+    @State private var authError: String = ""
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -39,6 +48,73 @@ struct SettingsView: View {
                     } footer: {
                         Text("URL Next.js-бэкенда. Должен быть доступен с устройства. Для локальной разработки используй IP-адрес твоего Mac в LAN, не localhost.")
                     }
+
+                    Section {
+                        if app.settings.isLoggedIn {
+                            HStack {
+                                Label("Вы вошли как", systemImage: "person.circle.fill")
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Text(app.settings.username)
+                                    .foregroundStyle(Theme.Palette.textSecondary)
+                            }
+                            
+                            Button(role: .destructive) {
+                                withAnimation {
+                                    app.settings.logout()
+                                    usernameDraft = ""
+                                    passwordDraft = ""
+                                }
+                            } label: {
+                                Label("Выйти из аккаунта", systemImage: "arrow.left.circle")
+                                    .foregroundStyle(.red)
+                            }
+                        } else {
+                            Picker("Режим", selection: $authMode) {
+                                Text("Вход").tag(AuthMode.login)
+                                Text("Регистрация").tag(AuthMode.register)
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(.vertical, 4)
+                            
+                            TextField("Имя пользователя", text: $usernameDraft)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .foregroundStyle(.white)
+                                .tint(.white)
+                            
+                            SecureField("Пароль", text: $passwordDraft)
+                                .foregroundStyle(.white)
+                                .tint(.white)
+                            
+                            if !authError.isEmpty {
+                                Text(authError)
+                                    .font(Theme.Typography.secondary)
+                                    .foregroundStyle(.red)
+                            }
+                            
+                            Button {
+                                performAuth()
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    if isAuthenticating {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Text(authMode == .login ? "Войти" : "Зарегистрироваться")
+                                            .fontWeight(.semibold)
+                                            .foregroundStyle(.white)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                            .disabled(usernameDraft.isEmpty || passwordDraft.isEmpty || isAuthenticating)
+                        }
+                    } header: {
+                        Text("Аккаунт PrismMusic")
+                    }
+
 
                     Section {
                         SecureField("Введи Yandex.Music token", text: $tokenDraft)
@@ -199,6 +275,59 @@ struct SettingsView: View {
         Task {
             try? await Task.sleep(for: .seconds(1.4))
             withAnimation { savedFlash = false }
+        }
+    }
+
+    private func performAuth() {
+        isAuthenticating = true
+        authError = ""
+        
+        Task {
+            do {
+                let response: UserResponse
+                if authMode == .login {
+                    response = try await app.api.login(
+                        username: usernameDraft.trimmingCharacters(in: .whitespacesAndNewlines),
+                        password: passwordDraft
+                    )
+                } else {
+                    response = try await app.api.register(
+                        username: usernameDraft.trimmingCharacters(in: .whitespacesAndNewlines),
+                        password: passwordDraft
+                    )
+                }
+                
+                // Success! Save details
+                app.settings.userId = response.id
+                app.settings.username = response.username
+                if let serverYandexToken = response.token, !serverYandexToken.isEmpty {
+                    app.settings.yandexToken = serverYandexToken
+                    tokenDraft = serverYandexToken
+                }
+                
+                // Clear draft inputs
+                usernameDraft = ""
+                passwordDraft = ""
+                authError = ""
+                
+                // Sync library likes
+                await app.library.syncWithServer()
+                
+            } catch {
+                if case APIError.httpStatus(let code, let preview) = error {
+                    if let preview = preview,
+                       let previewData = preview.data(using: .utf8),
+                       let errObj = try? JSONSerialization.jsonObject(with: previewData) as? [String: Any],
+                       let errMsg = errObj["error"] as? String {
+                        authError = errMsg
+                    } else {
+                        authError = "Неверный логин или пароль (код \(code))"
+                    }
+                } else {
+                    authError = error.localizedDescription
+                }
+            }
+            isAuthenticating = false
         }
     }
 }

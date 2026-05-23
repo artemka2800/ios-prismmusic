@@ -15,7 +15,7 @@ enum APIConfig {
     /// For local development on macOS while running `pnpm dev`, set this to
     /// `http://YOUR_MAC_LAN_IP:3000` (the simulator can't reach `localhost`
     /// from a physical device).
-    static let defaultBackendURL = "https://prism-music-virid.vercel.app"
+    static let defaultBackendURL = "https://prism-music-one.vercel.app"
 
     /// Request timeout for all API calls in seconds.
     static let timeoutSeconds: TimeInterval = 20

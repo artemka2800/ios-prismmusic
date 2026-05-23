@@ -20,7 +20,12 @@ final class LibraryStore {
     /// when they're not in the current playlist.
     private(set) var likedTracks: [Track]
 
-    init() {
+    private let api: APIClient?
+    private let settings: SettingsStore?
+
+    init(api: APIClient? = nil, settings: SettingsStore? = nil) {
+        self.api = api
+        self.settings = settings
         let defaults = UserDefaults.standard
         self.likedTrackIDs = Set(defaults.stringArray(forKey: Keys.likedIDs) ?? [])
         if let data = defaults.data(forKey: Keys.likedTracks),
@@ -45,6 +50,28 @@ final class LibraryStore {
             likedTracks.insert(track, at: 0)
         }
         persist()
+
+        if let api, let settings, settings.isLoggedIn {
+            Task {
+                do {
+                    _ = try await api.toggleLikeOnServer(userId: settings.userId, track: track)
+                } catch {
+                    print("[LibraryStore] Failed to toggle like on server: \(error)")
+                }
+            }
+        }
+    }
+
+    func syncWithServer() async {
+        guard let api, let settings, settings.isLoggedIn else { return }
+        do {
+            let serverLikes = try await api.fetchLikedTracks(userId: settings.userId)
+            self.likedTracks = serverLikes
+            self.likedTrackIDs = Set(serverLikes.map { $0.id })
+            persist()
+        } catch {
+            print("[LibraryStore] Failed to sync likes with server: \(error)")
+        }
     }
 
     func importYandexTracks(_ tracks: [Track]) -> Int {

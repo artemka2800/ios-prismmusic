@@ -6,5 +6,10 @@
 	<array>
 		<string>group.com.prism.music</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:prism-music-one.vercel.app</string>
+		<string>webcredentials:prism-music-one.vercel.app</string>
+	</array>
 </dict>
 </plist>
