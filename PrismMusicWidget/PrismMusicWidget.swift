@@ -2,13 +2,14 @@
 //  PrismMusicWidget.swift
 //  PrismMusicWidget
 //
-//  Minimal, bulletproof WidgetKit extension for PrismMusic.
-//  Shows current track info when playing, or a branded placeholder when idle.
+//  Bulletproof WidgetKit extension for PrismMusic with Async Image Loading.
+//  Shows current track info, live artwork from URL, and sync lyrics when playing.
 //
 
 import WidgetKit
 import SwiftUI
 
+// MARK: - App Group UserDefaults Helper
 extension UserDefaults {
     static var appGroup: UserDefaults? {
         let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music"
@@ -22,15 +23,7 @@ extension UserDefaults {
     }
 }
 
-// MARK: - Shared Constants
-private let kTitle    = "widget.track.title"
-private let kArtist   = "widget.track.artist"
-private let kSource   = "widget.track.source"
-private let kPlaying  = "widget.track.isPlaying"
-private let kLyrics   = "widget.track.lyricsLines"
-
 // MARK: - Timeline Entry
-
 struct PrismEntry: TimelineEntry {
     let date: Date
     let title: String
@@ -38,19 +31,19 @@ struct PrismEntry: TimelineEntry {
     let source: String
     let isPlaying: Bool
     let lyrics: [String]
+    let artwork: UIImage? // Prefetched artwork image
 
     var hasTrack: Bool {
-        !title.isEmpty && title != "idle"
+        !title.isEmpty && title != "idle" && title != "Не воспроизводится"
     }
 
     static let idle = PrismEntry(
         date: .now, title: "idle", artist: "", source: "",
-        isPlaying: false, lyrics: []
+        isPlaying: false, lyrics: [], artwork: nil
     )
 }
 
 // MARK: - Timeline Provider
-
 struct PrismProvider: TimelineProvider {
 
     func placeholder(in context: Context) -> PrismEntry {
@@ -59,30 +52,45 @@ struct PrismProvider: TimelineProvider {
 
     func getSnapshot(in context: Context,
                      completion: @escaping @Sendable (PrismEntry) -> Void) {
-        completion(readEntry())
+        Task {
+            let entry = await fetchEntry()
+            completion(entry)
+        }
     }
 
     func getTimeline(in context: Context,
                      completion: @escaping @Sendable (Timeline<PrismEntry>) -> Void) {
-        let entry = readEntry()
-        // Refresh every 15 min at most; the app calls reloadAllTimelines() on track change anyway.
-        let next = Calendar.current.date(byAdding: .minute, value: 15, to: entry.date)!
-        completion(Timeline(entries: [entry], policy: .after(next)))
+        Task {
+            let entry = await fetchEntry()
+            // Widgets update when app notifies via WidgetCenter, but we refresh every 15 min as a fallback.
+            let next = Calendar.current.date(byAdding: .minute, value: 15, to: entry.date)!
+            completion(Timeline(entries: [entry], policy: .after(next)))
+        }
     }
 
-    // Pure synchronous read — no networking, no semaphores, no async.
-    private func readEntry() -> PrismEntry {
-        // Try the official App Group first, then fall back to standard defaults.
+    // Fetches widget data + downloads artwork image asynchronously
+    private func fetchEntry() async -> PrismEntry {
         let defaults = UserDefaults.appGroup ?? .standard
 
-        let title    = defaults.string(forKey: kTitle) ?? ""
-        let artist   = defaults.string(forKey: kArtist) ?? ""
-        let source   = defaults.string(forKey: kSource) ?? ""
-        let playing  = defaults.bool(forKey: kPlaying)
-        let lyrics   = defaults.stringArray(forKey: kLyrics) ?? []
+        let title      = defaults.string(forKey: "widget.track.title") ?? ""
+        let artist     = defaults.string(forKey: "widget.track.artist") ?? ""
+        let source     = defaults.string(forKey: "widget.track.source") ?? ""
+        let playing    = defaults.bool(forKey: "widget.track.isPlaying")
+        let lyrics     = defaults.stringArray(forKey: "widget.track.lyricsLines") ?? []
+        let artworkURL = defaults.string(forKey: "widget.track.artworkURL") ?? ""
 
-        if title.isEmpty {
+        if title.isEmpty || title == "idle" || title == "Не воспроизводится" {
             return .idle
+        }
+
+        var image: UIImage? = nil
+        if !artworkURL.isEmpty, let url = URL(string: artworkURL) {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                image = UIImage(data: data)
+            } catch {
+                print("[PrismWidget] Failed to load artwork from \(artworkURL): \(error)")
+            }
         }
 
         return PrismEntry(
@@ -91,13 +99,13 @@ struct PrismProvider: TimelineProvider {
             artist: artist,
             source: source,
             isPlaying: playing,
-            lyrics: lyrics
+            lyrics: lyrics,
+            artwork: image
         )
     }
 }
 
-// MARK: - Prism Colors
-
+// MARK: - Colors & Gradients
 private enum Prism {
     static let purple  = Color(red: 0.65, green: 0.35, blue: 0.95)
     static let blue    = Color(red: 0.25, green: 0.55, blue: 1.0)
@@ -112,8 +120,7 @@ private enum Prism {
     static let bgDark = Color(red: 0.08, green: 0.08, blue: 0.09)
 }
 
-// MARK: - Background
-
+// MARK: - Widget Background
 struct PrismBackground: View {
     var body: some View {
         ZStack {
@@ -133,117 +140,118 @@ struct PrismBackground: View {
 }
 
 // MARK: - Small: Idle
-
 struct SmallIdleView: View {
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ZStack {
                 Circle()
                     .fill(Prism.gradient)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 40, height: 40)
                     .shadow(color: Prism.purple.opacity(0.4), radius: 8)
                 Image(systemName: "music.note")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
             }
-            .padding(.top, 6)
+            .padding(.top, 4)
 
-            Text("Открой меня и\nокунись в мир музыки")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
-
+            VStack(spacing: 4) {
+                Text("PrismMusic")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                
+                Text("Открой меня и окунись в мир музыки")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .lineSpacing(1.5)
+            }
+            
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
 // MARK: - Small: Now Playing
-
 struct SmallNowPlayingView: View {
     let entry: PrismEntry
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Source badge
-            HStack {
-                Spacer()
-                if !entry.source.isEmpty {
-                    Text(sourceLabel(entry.source))
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(.white.opacity(0.08)))
+            HStack(alignment: .top) {
+                if let artwork = entry.artwork {
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 52, height: 52)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
+                } else {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Prism.gradient)
+                        .frame(width: 52, height: 52)
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.white)
+                        }
                 }
-            }
-
-            Spacer()
-
-            // Music icon
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Prism.gradient.opacity(0.6))
+                
+                Spacer()
+                
+                // Play / Pause status badge
                 Image(systemName: entry.isPlaying ? "waveform" : "pause.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(entry.isPlaying ? Prism.purple : .white.opacity(0.4))
+                    .padding(6)
+                    .background(Circle().fill(.white.opacity(0.06)))
             }
-            .frame(width: 42, height: 42)
-            .padding(.bottom, 8)
-
-            // Title
+            
+            Spacer()
+            
             Text(entry.title)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(1)
-
-            // Artist
+            
             Text(entry.artist.isEmpty ? "—" : entry.artist)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.55))
                 .lineLimit(1)
+                .padding(.top, 2)
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    }
-
-    private func sourceLabel(_ s: String) -> String {
-        switch s.lowercased() {
-        case "yandex":     return "Я.Музыка"
-        case "soundcloud": return "SoundCloud"
-        case "spotify":    return "Spotify"
-        default:           return s.capitalized
-        }
     }
 }
 
 // MARK: - Medium: Idle
-
 struct MediumIdleView: View {
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 18) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Prism.gradient)
-                    .frame(width: 62, height: 62)
+                    .frame(width: 68, height: 68)
                     .shadow(color: Prism.purple.opacity(0.35), radius: 10)
                 Image(systemName: "waveform")
-                    .font(.system(size: 26, weight: .semibold))
+                    .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("PrismMusic")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                
                 Text("Открой меня и окунись в мир музыки")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(2)
                     .lineSpacing(2)
+                
                 Text("Треки, плейлисты и тексты песен — всегда под рукой")
                     .font(.system(size: 9))
                     .foregroundStyle(.white.opacity(0.35))
@@ -257,54 +265,68 @@ struct MediumIdleView: View {
 }
 
 // MARK: - Medium: Now Playing
-
 struct MediumNowPlayingView: View {
     let entry: PrismEntry
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Left: artwork placeholder + metadata
+        HStack(spacing: 16) {
+            // Left: metadata & cover
             VStack(alignment: .leading, spacing: 6) {
-                ZStack {
+                if let artwork = entry.artwork {
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+                } else {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Prism.gradient.opacity(0.6))
-                    Image(systemName: entry.isPlaying ? "waveform" : "pause.fill")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .fill(Prism.gradient)
+                        .frame(width: 60, height: 60)
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.white)
+                        }
                 }
-                .frame(width: 56, height: 56)
-
-                Text(entry.title)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text(entry.artist.isEmpty ? "—" : entry.artist)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .lineLimit(1)
-
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.title)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    
+                    Text(entry.artist.isEmpty ? "—" : entry.artist)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(1)
+                }
+                
                 if !entry.source.isEmpty {
                     Text(sourceLabel(entry.source))
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3.5)
+                        .background(Capsule().fill(.white.opacity(0.08)))
                 }
             }
             .frame(width: 110, alignment: .leading)
-
-            // Divider
+            
+            // Vertical Divider
             RoundedRectangle(cornerRadius: 1)
                 .fill(.white.opacity(0.08))
                 .frame(width: 1)
                 .padding(.vertical, 6)
-
+            
             // Right: lyrics
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 6) {
                 if !entry.lyrics.isEmpty {
                     ForEach(0..<min(3, entry.lyrics.count), id: \.self) { idx in
                         let line = entry.lyrics[idx]
                         Text(line)
                             .font(.system(size: 11, weight: idx == 0 ? .semibold : .regular))
-                            .foregroundStyle(.white.opacity(idx == 0 ? 1.0 : (idx == 1 ? 0.55 : 0.3)))
+                            .foregroundStyle(.white.opacity(idx == 0 ? 1.0 : (idx == 1 ? 0.6 : 0.35)))
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -339,7 +361,6 @@ struct MediumNowPlayingView: View {
 }
 
 // MARK: - Root Widget View
-
 struct PrismWidgetView: View {
     let entry: PrismEntry
     @Environment(\.widgetFamily) var family
@@ -362,7 +383,6 @@ struct PrismWidgetView: View {
 }
 
 // MARK: - Widget Entry Point
-
 @main
 struct PrismMusicWidget: Widget {
     let kind = "PrismMusicWidget"
@@ -375,7 +395,7 @@ struct PrismMusicWidget: Widget {
                 }
         }
         .configurationDisplayName("PrismMusic")
-        .description("Текущий трек и текст песни.")
+        .description("Текущий трек, обложка и текст песни.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
