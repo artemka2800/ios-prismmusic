@@ -184,7 +184,7 @@ final class APIClient {
             "title": track.title,
             "artist": track.artist,
             "coverUrl": track.cover?.absoluteString ?? "",
-            "duration": track.duration,
+            "duration": Int(track.durationSeconds ?? 0),
             "source": track.source?.rawValue ?? "unknown"
         ]
         let body: [String: Any] = [
