@@ -223,7 +223,11 @@ struct SmallNowPlayingView: View {
             }
         }
         .padding(14)
-        .frame(maxWidth: .infi// MARK: - Medium: Idle
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - Medium: Idle
 struct MediumIdleView: View {
     var body: some View {
         HStack(spacing: 20) {
