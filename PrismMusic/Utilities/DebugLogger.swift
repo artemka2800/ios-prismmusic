@@ -17,18 +17,11 @@ final class DebugLogger: @unchecked Sendable {
     }
     
     func start() {
-        // Redirect stderr and stdout to our file so we capture print() and internal logs
-        freopen(logPath, "a+", stderr)
-        freopen(logPath, "a+", stdout)
-        
-        // Disable buffering so logs are written immediately, preventing loss on crash
-        setbuf(stdout, nil)
-        setbuf(stderr, nil)
-        
         append("--- Debug Logger Started ---")
     }
     
     func append(_ message: String) {
+        print(message)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         let dateStr = formatter.string(from: Date())
