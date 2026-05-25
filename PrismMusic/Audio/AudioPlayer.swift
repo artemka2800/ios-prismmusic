@@ -539,6 +539,12 @@ final class AudioPlayer {
         defaults?.set(duration, forKey: "widget.track.duration")
         defaults?.set(lastUpdated, forKey: "widget.track.lastUpdated")
         defaults?.synchronize()
+        
+        if defaults == nil {
+            DebugLogger.shared.append("[WidgetSync] ⚠️ Warning: UserDefaults.appGroup is nil! App Groups are not configured or not supported by the signing profile.")
+        } else {
+            DebugLogger.shared.append("[WidgetSync] Success: Syncing '\(title)' (\(artist)) [playing: \(isPlaying), progress: \(Int(progress))/\(Int(duration))s]")
+        }
 
         let trackId = currentTrack?.id
         if !force &&
