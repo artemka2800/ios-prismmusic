@@ -179,184 +179,165 @@ struct SmallNowPlayingView: View {
     let entry: PrismEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                if let artwork = entry.artwork {
-                    Image(uiImage: artwork)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 52, height: 52)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
-                } else {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Prism.gradient)
-                        .frame(width: 52, height: 52)
-                        .overlay {
-                            Image(systemName: "music.note")
-                                .font(.system(size: 18))
-                                .foregroundStyle(.white)
-                        }
-                }
-                
-                Spacer()
-                
-                // Play / Pause status badge
-                Image(systemName: entry.isPlaying ? "waveform" : "pause.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(entry.isPlaying ? Prism.purple : .white.opacity(0.4))
-                    .padding(6)
-                    .background(Circle().fill(.white.opacity(0.06)))
+        VStack(alignment: .leading, spacing: 8) {
+            if let artwork = entry.artwork {
+                Image(uiImage: artwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 60, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Prism.gradient)
+                    .frame(width: 60, height: 60)
+                    .overlay {
+                        Image(systemName: "music.note")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.white)
+                    }
             }
             
-            Spacer()
+            Spacer(minLength: 0)
             
-            Text(entry.title)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-            
-            Text(entry.artist.isEmpty ? "—" : entry.artist)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.55))
-                .lineLimit(1)
-                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.title)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                
+                Text(entry.artist.isEmpty ? "—" : entry.artist)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+            }
         }
-        .padding(12)
+        .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
 
-// MARK: - Medium: Idle
-struct MediumIdleView: View {
+// MARK: - Large: Idle
+struct LargeIdleView: View {
     var body: some View {
-        HStack(spacing: 18) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Prism.gradient)
-                    .frame(width: 68, height: 68)
-                    .shadow(color: Prism.purple.opacity(0.35), radius: 10)
-                Image(systemName: "waveform")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Prism.gradient)
+                        .frame(width: 52, height: 52)
+                        .shadow(color: Prism.purple.opacity(0.35), radius: 10)
+                    Image(systemName: "waveform")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("PrismMusic")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("Музыкальный плеер")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("PrismMusic")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+            
+            RoundedRectangle(cornerRadius: 1)
+                .fill(.white.opacity(0.08))
+                .frame(height: 1)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Добро пожаловать в мир звука")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                 
-                Text("Открой меня и окунись в мир музыки")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .lineLimit(2)
-                    .lineSpacing(2)
-                
-                Text("Треки, плейлисты и тексты песен — всегда под рукой")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.white.opacity(0.35))
-                    .lineLimit(1)
+                Text("Откройте приложение PrismMusic, выберите любимый трек или плейлист и начните прослушивание.")
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .lineSpacing(4)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Spacer()
         }
         .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
 
-// MARK: - Medium: Now Playing
-struct MediumNowPlayingView: View {
+// MARK: - Large: Now Playing
+struct LargeNowPlayingView: View {
     let entry: PrismEntry
 
     var body: some View {
-        HStack(spacing: 16) {
-            // Left: metadata & cover
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 14) {
+            // Top section: cover, title, artist
+            HStack(spacing: 16) {
                 if let artwork = entry.artwork {
                     Image(uiImage: artwork)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .frame(width: 76, height: 76)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
                 } else {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(Prism.gradient)
-                        .frame(width: 60, height: 60)
+                        .frame(width: 76, height: 76)
                         .overlay {
                             Image(systemName: "music.note")
-                                .font(.system(size: 20))
+                                .font(.system(size: 24))
                                 .foregroundStyle(.white)
                         }
                 }
-                
-                VStack(alignment: .leading, spacing: 2) {
+
+                VStack(alignment: .leading, spacing: 4) {
                     Text(entry.title)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
-                        .lineLimit(1)
-                    
+                        .lineLimit(2)
+
                     Text(entry.artist.isEmpty ? "—" : entry.artist)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
                 }
-                
-                if !entry.source.isEmpty {
-                    Text(sourceLabel(entry.source))
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3.5)
-                        .background(Capsule().fill(.white.opacity(0.08)))
-                }
+                Spacer(minLength: 0)
             }
-            .frame(width: 110, alignment: .leading)
-            
-            // Vertical Divider
+
+            // Elegant Divider
             RoundedRectangle(cornerRadius: 1)
                 .fill(.white.opacity(0.08))
-                .frame(width: 1)
-                .padding(.vertical, 6)
-            
-            // Right: lyrics
-            VStack(alignment: .leading, spacing: 6) {
+                .frame(height: 1)
+
+            // Lyrics section
+            VStack(alignment: .leading, spacing: 8) {
                 if !entry.lyrics.isEmpty {
-                    ForEach(0..<min(3, entry.lyrics.count), id: \.self) { idx in
-                        let line = entry.lyrics[idx]
-                        Text(line)
-                            .font(.system(size: 11, weight: idx == 0 ? .semibold : .regular))
-                            .foregroundStyle(.white.opacity(idx == 0 ? 1.0 : (idx == 1 ? 0.6 : 0.35)))
-                            .lineLimit(2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(0..<min(7, entry.lyrics.count), id: \.self) { idx in
+                            Text(entry.lyrics[idx])
+                                .font(.system(size: 12, weight: idx == 0 ? .semibold : .regular, design: .rounded))
+                                .foregroundStyle(idx == 0 ? Color.white : Color.white.opacity(max(0.12, 0.8 - Double(idx) * 0.12)))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
-                    Spacer(minLength: 0)
                 } else {
-                    Spacer()
-                    Text("Текст песни отсутствует")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("Включите трек с текстом.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.35))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Текст песни отсутствует")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.6))
+                        Text("Включите трек с текстом в приложении.")
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.35))
+                    }
+                    .padding(.vertical, 8)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Spacer(minLength: 0)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func sourceLabel(_ s: String) -> String {
-        switch s.lowercased() {
-        case "yandex":     return "Я.Музыка"
-        case "soundcloud": return "SoundCloud"
-        case "spotify":    return "Spotify"
-        default:           return s.capitalized
-        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
 
@@ -371,9 +352,9 @@ struct PrismWidgetView: View {
             case .systemSmall:
                 if entry.hasTrack { SmallNowPlayingView(entry: entry) }
                 else              { SmallIdleView() }
-            case .systemMedium:
-                if entry.hasTrack { MediumNowPlayingView(entry: entry) }
-                else              { MediumIdleView() }
+            case .systemLarge:
+                if entry.hasTrack { LargeNowPlayingView(entry: entry) }
+                else              { LargeIdleView() }
             default:
                 if entry.hasTrack { SmallNowPlayingView(entry: entry) }
                 else              { SmallIdleView() }
@@ -396,6 +377,6 @@ struct PrismMusicWidget: Widget {
         }
         .configurationDisplayName("PrismMusic")
         .description("Текущий трек, обложка и текст песни.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemLarge])
     }
 }

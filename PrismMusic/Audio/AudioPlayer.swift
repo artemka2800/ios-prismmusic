@@ -500,19 +500,19 @@ final class AudioPlayer {
         if let lyrics = self.lyrics, lyrics.isSynced {
             let t = self.progress
             if let activeIndex = lyrics.lines.lastIndex(where: { $0.time <= t }) {
-                for offset in 0..<3 {
+                for offset in 0..<8 {
                     let idx = activeIndex + offset
                     if idx < lyrics.lines.count {
                         lyricsLines.append(lyrics.lines[idx].text)
                     }
                 }
             } else {
-                for idx in 0..<min(3, lyrics.lines.count) {
+                for idx in 0..<min(8, lyrics.lines.count) {
                     lyricsLines.append(lyrics.lines[idx].text)
                 }
             }
         } else if let lyrics = self.lyrics {
-            for idx in 0..<min(3, lyrics.lines.count) {
+            for idx in 0..<min(8, lyrics.lines.count) {
                 lyricsLines.append(lyrics.lines[idx].text)
             }
         }
