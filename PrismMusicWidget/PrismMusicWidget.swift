@@ -89,7 +89,7 @@ struct PrismProvider: TimelineProvider {
         // Try reading from Keychain first (works on free developer accounts where App Groups are blocked)
         if let jsonString = KeychainHelper.get("widget.track.state"),
            let jsonData = jsonString.data(using: .utf8),
-           let state = try? JSONDecoder().decode(WidgetTrackState.self) {
+           let state = try? JSONDecoder().decode(WidgetTrackState.self, from: jsonData) {
             
             title       = state.title
             artist      = state.artist
