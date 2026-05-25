@@ -25,7 +25,23 @@ final class DebugLogger: @unchecked Sendable {
         setbuf(stdout, nil)
         setbuf(stderr, nil)
         
-        print("--- Debug Logger Started ---")
+        append("--- Debug Logger Started ---")
+    }
+    
+    func append(_ message: String) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let dateStr = formatter.string(from: Date())
+        let line = "[\(dateStr)] \(message)\n"
+        if let data = line.data(using: .utf8) {
+            if let fileHandle = FileHandle(forWritingAtPath: logPath) {
+                defer { try? fileHandle.close() }
+                fileHandle.seekToEndOfFile()
+                fileHandle.write(data)
+            } else {
+                try? line.write(toFile: logPath, atomically: true, encoding: .utf8)
+            }
+        }
     }
     
     func readLogs() -> String {

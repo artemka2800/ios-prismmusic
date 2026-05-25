@@ -93,7 +93,11 @@ struct PrismProvider: TimelineProvider {
         var image: UIImage? = nil
         if !artworkURL.isEmpty, let url = URL(string: artworkURL) {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let config = URLSessionConfiguration.default
+                config.timeoutIntervalForRequest = 3.0
+                config.timeoutIntervalForResource = 3.0
+                let session = URLSession(configuration: config)
+                let (data, _) = try await session.data(from: url)
                 image = UIImage(data: data)
             } catch {
                 print("[PrismWidget] Failed to load artwork from \(artworkURL): \(error)")
@@ -181,6 +185,7 @@ struct SmallIdleView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .unredacted()
     }
 }
 
@@ -259,6 +264,7 @@ struct MediumIdleView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .unredacted()
     }
 }
 
