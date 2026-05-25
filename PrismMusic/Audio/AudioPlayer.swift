@@ -109,6 +109,9 @@ final class AudioPlayer {
         attachEndNotification()
         // Volume mirror for Now Playing.
         storedVolume = player.volume
+        
+        // Sync widget state on app launch
+        updateWidgetState(force: true)
     }
 
     /// Replace the queue and start playing the first track.
@@ -190,8 +193,10 @@ final class AudioPlayer {
         let target = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
             Task { @MainActor in
-                self?.progress = seconds
-                self?.updateNowPlaying()
+                guard let self else { return }
+                self.progress = seconds
+                self.updateNowPlaying()
+                self.updateWidgetState(force: true)
             }
         }
     }
@@ -495,6 +500,9 @@ final class AudioPlayer {
         let source = currentTrack?.source?.rawValue ?? ""
         let isPlaying = self.isPlaying
         let artworkURL = currentTrack?.artworkURL?.absoluteString ?? ""
+        let progress = self.progress
+        let duration = self.duration
+        let lastUpdated = Date.now.timeIntervalSince1970
         
         var lyricsLines: [String] = []
         if let lyrics = self.lyrics, lyrics.isSynced {
@@ -517,6 +525,21 @@ final class AudioPlayer {
             }
         }
         
+        // Write playback state to UserDefaults on every update so that even if we don't
+        // trigger a timeline reload (to avoid throttling), the values are ready in UserDefaults
+        // when WidgetKit decides to fetch a new timeline entry.
+        defaults?.set(title, forKey: "widget.track.title")
+        defaults?.set(artist, forKey: "widget.track.artist")
+        defaults?.set(album, forKey: "widget.track.album")
+        defaults?.set(source, forKey: "widget.track.source")
+        defaults?.set(isPlaying, forKey: "widget.track.isPlaying")
+        defaults?.set(lyricsLines, forKey: "widget.track.lyricsLines")
+        defaults?.set(artworkURL, forKey: "widget.track.artworkURL")
+        defaults?.set(progress, forKey: "widget.track.progress")
+        defaults?.set(duration, forKey: "widget.track.duration")
+        defaults?.set(lastUpdated, forKey: "widget.track.lastUpdated")
+        defaults?.synchronize()
+
         let trackId = currentTrack?.id
         if !force &&
             trackId == lastWidgetTrackId &&
@@ -528,15 +551,6 @@ final class AudioPlayer {
         lastWidgetTrackId = trackId
         lastWidgetIsPlaying = isPlaying
         lastWidgetLyricsLines = lyricsLines
-        
-        defaults?.set(title, forKey: "widget.track.title")
-        defaults?.set(artist, forKey: "widget.track.artist")
-        defaults?.set(album, forKey: "widget.track.album")
-        defaults?.set(source, forKey: "widget.track.source")
-        defaults?.set(isPlaying, forKey: "widget.track.isPlaying")
-        defaults?.set(lyricsLines, forKey: "widget.track.lyricsLines")
-        defaults?.set(artworkURL, forKey: "widget.track.artworkURL")
-        defaults?.synchronize()
         
         WidgetCenter.shared.reloadAllTimelines()
     }
