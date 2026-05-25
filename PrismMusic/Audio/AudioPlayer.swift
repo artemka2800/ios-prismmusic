@@ -540,8 +540,25 @@ final class AudioPlayer {
         defaults?.set(lastUpdated, forKey: "widget.track.lastUpdated")
         defaults?.synchronize()
         
+        // Write state to Keychain so widget can read it even without App Groups
+        let state = WidgetTrackState(
+            title: title,
+            artist: artist,
+            source: source,
+            isPlaying: isPlaying,
+            lyricsLines: lyricsLines,
+            artworkURL: artworkURL,
+            progress: progress,
+            duration: duration,
+            lastUpdated: lastUpdated
+        )
+        if let jsonData = try? JSONEncoder().encode(state),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            KeychainStore.set(jsonString, for: "widget.track.state")
+        }
+        
         if defaults == nil {
-            DebugLogger.shared.append("[WidgetSync] ⚠️ Warning: UserDefaults.appGroup is nil! App Groups are not configured or not supported by the signing profile.")
+            DebugLogger.shared.append("[WidgetSync] ⚠️ Warning: UserDefaults.appGroup is nil! Succeeded in writing to Keychain as fallback.")
         } else {
             DebugLogger.shared.append("[WidgetSync] Success: Syncing '\(title)' (\(artist)) [playing: \(isPlaying), progress: \(Int(progress))/\(Int(duration))s]")
         }
@@ -611,4 +628,16 @@ extension UserDefaults {
         let groupName = "group.\(baseId)"
         return UserDefaults(suiteName: groupName)
     }
+}
+
+struct WidgetTrackState: Codable {
+    let title: String
+    let artist: String
+    let source: String
+    let isPlaying: Bool
+    let lyricsLines: [String]
+    let artworkURL: String
+    let progress: Double
+    let duration: Double
+    let lastUpdated: Double
 }

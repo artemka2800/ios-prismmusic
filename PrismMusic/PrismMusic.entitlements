@@ -11,5 +11,9 @@
 		<string>applinks:prism-music-one.vercel.app</string>
 		<string>webcredentials:prism-music-one.vercel.app</string>
 	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)*</string>
+	</array>
 </dict>
 </plist>

@@ -8,6 +8,7 @@
 
 import WidgetKit
 import SwiftUI
+import Security
 
 // MARK: - App Group UserDefaults Helper
 extension UserDefaults {
@@ -74,17 +75,47 @@ struct PrismProvider: TimelineProvider {
 
     // Fetches widget data + downloads artwork image asynchronously
     private func fetchEntry() async -> PrismEntry {
-        let defaults = UserDefaults.appGroup ?? .standard
-
-        let title       = defaults.string(forKey: "widget.track.title") ?? ""
-        let artist      = defaults.string(forKey: "widget.track.artist") ?? ""
-        let source      = defaults.string(forKey: "widget.track.source") ?? ""
-        let playing     = defaults.bool(forKey: "widget.track.isPlaying")
-        let lyrics      = defaults.stringArray(forKey: "widget.track.lyricsLines") ?? []
-        let artworkURL  = defaults.string(forKey: "widget.track.artworkURL") ?? ""
-        let progress    = defaults.double(forKey: "widget.track.progress")
-        let duration    = defaults.double(forKey: "widget.track.duration")
-        let lastUpdated = defaults.double(forKey: "widget.track.lastUpdated")
+        var title       = ""
+        var artist      = ""
+        var source      = ""
+        var playing     = false
+        var lyrics      = [String]()
+        var artworkURL  = ""
+        var progress    = 0.0
+        var duration    = 0.0
+        var lastUpdated = Date.now.timeIntervalSince1970
+        var hasLoadedState = false
+        
+        // Try reading from Keychain first (works on free developer accounts where App Groups are blocked)
+        if let jsonString = KeychainHelper.get("widget.track.state"),
+           let jsonData = jsonString.data(using: .utf8),
+           let state = try? JSONDecoder().decode(WidgetTrackState.self) {
+            
+            title       = state.title
+            artist      = state.artist
+            source      = state.source
+            playing     = state.isPlaying
+            lyrics      = state.lyricsLines
+            artworkURL  = state.artworkURL
+            progress    = state.progress
+            duration    = state.duration
+            lastUpdated = state.lastUpdated
+            hasLoadedState = true
+        }
+        
+        // Fallback to UserDefaults if Keychain is empty or unavailable
+        if !hasLoadedState {
+            let defaults = UserDefaults.appGroup ?? .standard
+            title       = defaults.string(forKey: "widget.track.title") ?? ""
+            artist      = defaults.string(forKey: "widget.track.artist") ?? ""
+            source      = defaults.string(forKey: "widget.track.source") ?? ""
+            playing     = defaults.bool(forKey: "widget.track.isPlaying")
+            lyrics      = defaults.stringArray(forKey: "widget.track.lyricsLines") ?? []
+            artworkURL  = defaults.string(forKey: "widget.track.artworkURL") ?? ""
+            progress    = defaults.double(forKey: "widget.track.progress")
+            duration    = defaults.double(forKey: "widget.track.duration")
+            lastUpdated = defaults.double(forKey: "widget.track.lastUpdated")
+        }
 
         if title.isEmpty || title == "idle" || title == "Не воспроизводится" {
             return .idle
@@ -413,4 +444,33 @@ struct PrismMusicWidget: Widget {
         .description("Текущий трек, обложка и прогресс воспроизведения.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
+}
+
+// MARK: - Keychain Helper for Sideloading
+enum KeychainHelper {
+    static func get(_ key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.prism.music",
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+}
+
+struct WidgetTrackState: Codable {
+    let title: String
+    let artist: String
+    let source: String
+    let isPlaying: Bool
+    let lyricsLines: [String]
+    let artworkURL: String
+    let progress: Double
+    let duration: Double
+    let lastUpdated: Double
 }

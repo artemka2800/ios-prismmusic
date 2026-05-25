@@ -146,7 +146,6 @@ struct SettingsView: View {
                             
                             VStack(alignment: .leading, spacing: 14) {
                                 Button {
-                                    logsContent = DebugLogger.shared.readLogs()
                                     showDebugLogs = true
                                 } label: {
                                     Label("Посмотреть логи (Debug)", systemImage: "ladybug")
@@ -211,19 +210,7 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showDebugLogs) {
                 NavigationStack {
-                    ScrollView {
-                        Text(logsContent)
-                            .font(.system(size: 10, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                    }
-                    .navigationTitle("Логи")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Закрыть") { showDebugLogs = false }
-                        }
-                    }
+                    RealTimeLogsView(isPresented: $showDebugLogs)
                 }
             }
         }
@@ -279,6 +266,55 @@ struct SettingsView: View {
         Task {
             try? await Task.sleep(for: .seconds(1.4))
             withAnimation { savedFlash = false }
+        }
+    }
+}
+
+// MARK: - Real Time Logs View
+struct RealTimeLogsView: View {
+    @Binding var isPresented: Bool
+    @State private var logsContent = ""
+    @State private var timer: Timer? = nil
+
+    var body: some View {
+        ScrollView {
+            ScrollViewReader { proxy in
+                Text(logsContent)
+                    .font(.system(size: 10, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .id("logsText")
+                    .onChange(of: logsContent) {
+                        withAnimation {
+                            proxy.scrollTo("logsText", anchor: .bottom)
+                        }
+                    }
+            }
+        }
+        .navigationTitle("Логи")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Закрыть") { isPresented = false }
+            }
+        }
+        .onAppear {
+            loadLogs()
+            // Refresh logs every second
+            timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                loadLogs()
+            }
+        }
+        .onDisappear {
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
+    private func loadLogs() {
+        let content = DebugLogger.shared.readLogs()
+        if content != logsContent {
+            logsContent = content
         }
     }
 }
