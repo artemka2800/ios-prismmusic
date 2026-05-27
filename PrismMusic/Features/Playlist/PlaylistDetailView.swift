@@ -120,9 +120,16 @@ struct PlaylistDetailView: View {
                         Text("·")
                             .foregroundStyle(Theme.Palette.textTertiary)
                         HStack(spacing: 4) {
-                            Image(systemName: source.iconName)
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(source.iconColor)
+                            if source.hasCustomIcon {
+                                Image(source.rawValue)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 14, height: 14)
+                            } else {
+                                Image(systemName: "music.note")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
                             Text(source.label)
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Theme.Palette.textTertiary)

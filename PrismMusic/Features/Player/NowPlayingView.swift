@@ -342,9 +342,16 @@ struct NowPlayingView: View {
         VStack(spacing: 4) {
             if let source = app.audio.currentTrack?.source {
                 HStack(spacing: 4) {
-                    Image(systemName: source.iconName)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(source.iconColor)
+                    if source.hasCustomIcon {
+                        Image(source.rawValue)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 12, height: 12)
+                    } else {
+                        Image(systemName: "music.note")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
                     Text(source.label)
                         .font(.system(size: 10, weight: .semibold))
                         .tracking(2)

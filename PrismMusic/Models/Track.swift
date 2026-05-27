@@ -123,22 +123,8 @@ enum TrackSource: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    var iconName: String {
-        switch self {
-        case .yandex: "play.circle.fill"
-        case .soundcloud: "cloud.fill"
-        case .spotify: "waveform.circle.fill"
-        case .other: "music.note"
-        }
-    }
-
-    var iconColor: Color {
-        switch self {
-        case .yandex: .yellow
-        case .soundcloud: .orange
-        case .spotify: .green
-        case .other: .secondary
-        }
+    var hasCustomIcon: Bool {
+        self != .other
     }
 }
 

@@ -30,33 +30,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         header
                         
-                        // Server config card
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Сервер PrismMusic")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Theme.Palette.textSecondary)
-                                .padding(.horizontal, 4)
-                            
-                            VStack(alignment: .leading, spacing: 12) {
-                                TextField("https://prism.example.com", text: $backendDraft)
-                                    .textInputAutocapitalization(.never)
-                                    .keyboardType(.URL)
-                                    .autocorrectionDisabled()
-                                    .padding(12)
-                                    .background(Color.black.opacity(0.2))
-                                    .cornerRadius(10)
-                                    .foregroundStyle(.white)
-                                    .tint(.white)
-                            }
-                            .padding(14)
-                            .prismGlass(cornerRadius: 16)
-                            
-                            Text("URL Next.js-бэкенда. Должен быть доступен с устройства. Для локальной разработки используй IP-адрес вашего Mac в LAN, не localhost.")
-                                .font(Theme.Typography.caption)
-                                .foregroundStyle(Theme.Palette.textTertiary)
-                                .padding(.horizontal, 4)
-                        }
-                        
+
                         // Yandex.Music config card
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Yandex.Music")
