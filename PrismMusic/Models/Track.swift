@@ -123,9 +123,6 @@ enum TrackSource: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    var hasCustomIcon: Bool {
-        self != .other
-    }
 }
 
 /// An album / playlist / track-group as returned by search & recommendations.

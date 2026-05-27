@@ -118,7 +118,7 @@ struct SearchView: View {
             Text("Найди свои треки")
                 .font(Theme.Typography.title)
                 .foregroundStyle(.white)
-            Text("Поиск работает по Я.Музыке и SoundCloud")
+            Text("Поиск работает по Я.Музыке, SoundCloud и Spotify")
                 .font(Theme.Typography.secondary)
                 .foregroundStyle(Theme.Palette.textSecondary)
                 .multilineTextAlignment(.center)

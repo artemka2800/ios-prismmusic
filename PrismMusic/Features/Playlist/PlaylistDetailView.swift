@@ -119,24 +119,12 @@ struct PlaylistDetailView: View {
                     if let source = album.source {
                         Text("·")
                             .foregroundStyle(Theme.Palette.textTertiary)
-                        HStack(spacing: 4) {
-                            if source.hasCustomIcon {
-                                Image(source.rawValue)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 14, height: 14)
-                            } else {
-                                Image(systemName: "music.note")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(source.label)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.Palette.textTertiary)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                        Text(source.label)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.Palette.textTertiary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
                     }
                 }
             }
