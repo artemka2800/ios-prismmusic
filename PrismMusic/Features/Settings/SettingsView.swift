@@ -171,6 +171,7 @@ struct SettingsView: View {
                 .scrollIndicators(.hidden)
             }
             .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .safeAreaPadding(.bottom, app.audio.currentTrack != nil ? 100 : 0)
             .alert("Yandex.Music token", isPresented: $showTokenInfo) {
                 Button("OK", role: .cancel) {}

@@ -36,6 +36,7 @@ struct AccountView: View {
                 .scrollIndicators(.hidden)
             }
             .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 

@@ -25,6 +25,7 @@ struct LibraryView: View {
                 }
             }
             .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 

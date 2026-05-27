@@ -64,14 +64,17 @@ struct PlaylistDetailView: View {
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
                     .foregroundStyle(.white)
+                    .contentShape(Circle())
             }
             .buttonStyle(GlassCircleButtonStyle())
             .padding(.leading, Theme.Layout.screenInset)
-            .padding(.top, 55)
+            .padding(.top, 52)
         }
         .navigationBarHidden(true)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadTracks()
         }

@@ -44,6 +44,7 @@ struct HomeView: View {
                 }
             }
             .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Album.self) { album in
                 PlaylistDetailView(album: album)
             }

@@ -31,6 +31,10 @@ struct SearchView: View {
                 }
             }
             .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: Album.self) { album in
+                PlaylistDetailView(album: album)
+            }
         }
     }
 
@@ -193,7 +197,7 @@ struct SearchView: View {
     }
 
     private func searchPlaylistCard(_ album: Album) -> some View {
-        NavigationLink(destination: PlaylistDetailView(album: album)) {
+        NavigationLink(value: album) {
             VStack(alignment: .leading, spacing: 6) {
                 // Small square cover (100pt)
                 AsyncImage(url: album.artworkURL) { phase in
