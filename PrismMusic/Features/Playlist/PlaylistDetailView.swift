@@ -81,42 +81,57 @@ struct PlaylistDetailView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 16) {
-            // Album cover image
-            AsyncImage(url: album.artworkURL) { phase in
-                if let image = phase.image {
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } else if phase.error != nil {
-                    fallbackCover
-                } else {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.04))
-                        .overlay {
-                            ProgressView()
-                                .tint(Theme.Palette.textTertiary)
-                        }
+        VStack(spacing: 20) {
+            // Album cover image with ambient glow
+            ZStack {
+                AsyncImage(url: album.artworkURL) { phase in
+                    if let image = phase.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .blur(radius: 28, opaque: false)
+                            .opacity(0.55)
+                            .scaleEffect(0.95)
+                            .offset(y: 10)
+                    }
                 }
+                .frame(width: 180, height: 180)
+                
+                AsyncImage(url: album.artworkURL) { phase in
+                    if let image = phase.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else if phase.error != nil {
+                        fallbackCover
+                    } else {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.04))
+                            .overlay {
+                                ProgressView()
+                                    .tint(Theme.Palette.textTertiary)
+                            }
+                    }
+                }
+                .frame(width: 180, height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                )
             }
-            .frame(width: 180, height: 180)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.45), radius: 20, y: 12)
 
             VStack(spacing: 6) {
                 Text(album.title)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .tracking(-0.3)
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
 
                 HStack(spacing: 8) {
                     Text(album.artist)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.Palette.textSecondary)
                 }
             }
@@ -135,6 +150,7 @@ struct PlaylistDetailView: View {
                 .foregroundStyle(.white.opacity(0.4))
         }
         .frame(width: 180, height: 180)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var controlsSection: some View {
@@ -148,11 +164,10 @@ struct PlaylistDetailView: View {
                     .font(.system(size: 15, weight: .semibold))
             }
             .foregroundStyle(.black)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 12)
-            .background(Color.white, in: Capsule())
-            .shadow(color: .white.opacity(0.12), radius: 10, y: 4)
+            .padding(.horizontal, 36)
+            .padding(.vertical, 13)
         }
+        .buttonStyle(PlayButtonStyle())
     }
 
     private var tracksList: some View {
@@ -250,5 +265,18 @@ private struct Backdrop: View {
                 endPoint: .bottom
             )
         }
+    }
+}
+
+struct PlayButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.85 : 1.0))
+            )
+            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
+            .shadow(color: .white.opacity(configuration.isPressed ? 0.08 : 0.15), radius: 12, y: 4)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }

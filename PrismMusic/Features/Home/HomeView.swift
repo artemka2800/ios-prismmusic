@@ -13,6 +13,12 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(AppState.self) private var app
+    @State private var activeTab: HomeTab = .home
+    @Namespace private var tabNamespace
+
+    enum HomeTab {
+        case home, hot
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,7 +38,13 @@ struct HomeView: View {
                         case .failed(let message):
                             errorState(message)
                         case .loaded:
-                            albumGrid
+                            VStack(alignment: .leading, spacing: 0) {
+                                tabSelector
+                                albumGrid
+                                if activeTab == .home {
+                                    recentlyPlayedSection
+                                }
+                            }
                         }
                     }
                     .padding(.bottom, 140) // mini-player + tab bar room
@@ -72,13 +84,14 @@ struct HomeView: View {
             )
 
             // Text content — no background, no substrate
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("PrismMusic")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .font(.system(size: 32, weight: .black, design: .rounded))
+                    .tracking(-0.5)
                     .foregroundStyle(.white)
 
                 Text("Слушай подборки и любимые треки")
-                    .font(.system(size: 14))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Theme.Palette.textSecondary)
             }
             .padding(.horizontal, Theme.Layout.screenInset + 4)
@@ -161,21 +174,87 @@ struct HomeView: View {
 
     // MARK: - Album grid
 
+    private var displayedAlbums: [Album] {
+        let albums = app.recommendations.albums
+        guard !albums.isEmpty else { return [] }
+        if activeTab == .home {
+            return Array(albums.prefix(12))
+        } else {
+            if albums.count > 12 {
+                return Array(albums.suffix(from: 12))
+            } else {
+                let halfIndex = albums.count / 2
+                return Array(albums.suffix(from: halfIndex))
+            }
+        }
+    }
+
+    private var tabSelector: some View {
+        HStack(spacing: 24) {
+            Button {
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.76)) {
+                    activeTab = .home
+                }
+            } label: {
+                VStack(spacing: 6) {
+                    Text("Главная")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(activeTab == .home ? .white : .white.opacity(0.45))
+                    
+                    if activeTab == .home {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.white)
+                            .frame(width: 20, height: 3)
+                            .matchedGeometryEffect(id: "activeTabUnderline", in: tabNamespace)
+                    } else {
+                        Color.clear
+                            .frame(width: 20, height: 3)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            
+            Button {
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.76)) {
+                    activeTab = .hot
+                }
+            } label: {
+                VStack(spacing: 6) {
+                    Text("Новое и горячее")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(activeTab == .hot ? .white : .white.opacity(0.45))
+                    
+                    if activeTab == .hot {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.white)
+                            .frame(width: 20, height: 3)
+                            .matchedGeometryEffect(id: "activeTabUnderline", in: tabNamespace)
+                    } else {
+                        Color.clear
+                            .frame(width: 20, height: 3)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, Theme.Layout.screenInset)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+
     private var albumGrid: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Section title — no background
-            Text("Подборки для вас")
-                .font(.system(size: 20, weight: .bold))
+            Text(activeTab == .home ? "Выбор редакции" : "Сейчас в тренде")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .padding(.horizontal, Theme.Layout.screenInset)
 
-            if app.recommendations.albums.isEmpty {
+            if displayedAlbums.isEmpty {
                 Text("Нет подборок")
                     .font(Theme.Typography.secondary)
                     .foregroundStyle(Theme.Palette.textSecondary)
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else {
-                // 2-column grid matching web design
                 LazyVGrid(
                     columns: [
                         GridItem(.flexible(), spacing: 14),
@@ -183,7 +262,7 @@ struct HomeView: View {
                     ],
                     spacing: 18
                 ) {
-                    ForEach(app.recommendations.albums) { album in
+                    ForEach(displayedAlbums) { album in
                         AlbumCardView(album: album)
                     }
                 }
@@ -191,6 +270,35 @@ struct HomeView: View {
             }
         }
         .padding(.top, 8)
+    }
+
+    private var recentlyPlayedSection: some View {
+        Group {
+            let albums = app.recommendations.albums
+            let limit = activeTab == .home ? 12 : 6
+            if albums.count > limit {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Недавно слушал")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Theme.Layout.screenInset)
+                    
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 14),
+                            GridItem(.flexible(), spacing: 14)
+                        ],
+                        spacing: 18
+                    ) {
+                        ForEach(Array(albums.suffix(from: limit).prefix(6))) { album in
+                            AlbumCardView(album: album)
+                        }
+                    }
+                    .padding(.horizontal, Theme.Layout.screenInset)
+                }
+                .padding(.top, 24)
+            }
+        }
     }
 
 

@@ -89,7 +89,14 @@ struct AccountView: View {
                         .foregroundStyle(syncFlash ? .green : .white)
                     Spacer()
                 }
+                .padding(12)
+                .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                )
             }
+            .buttonStyle(.plain)
             
             Divider()
                 .background(Color.white.opacity(0.1))
@@ -108,10 +115,21 @@ struct AccountView: View {
                         .foregroundStyle(.red)
                     Spacer()
                 }
+                .padding(12)
+                .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.red.opacity(0.2), lineWidth: 0.5)
+                )
             }
+            .buttonStyle(.plain)
         }
         .padding()
         .prismGlass(cornerRadius: 16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
     }
 
     private var authCard: some View {
@@ -131,8 +149,12 @@ struct AccountView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .padding(12)
-                    .background(Color.black.opacity(0.2))
-                    .cornerRadius(8)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
                     .foregroundStyle(.white)
                     .tint(.white)
             }
@@ -143,8 +165,12 @@ struct AccountView: View {
                     .foregroundStyle(Theme.Palette.textSecondary)
                 SecureField("••••••••", text: $passwordDraft)
                     .padding(12)
-                    .background(Color.black.opacity(0.2))
-                    .cornerRadius(8)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
                     .foregroundStyle(.white)
                     .tint(.white)
             }
@@ -172,13 +198,22 @@ struct AccountView: View {
                     Spacer()
                 }
                 .padding()
-                .background(usernameDraft.isEmpty || passwordDraft.isEmpty ? Color.white.opacity(0.1) : Color.white.opacity(0.2))
+                .background(usernameDraft.isEmpty || passwordDraft.isEmpty ? Color.white.opacity(0.06) : Color.white.opacity(0.12))
                 .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                )
             }
+            .buttonStyle(.plain)
             .disabled(usernameDraft.isEmpty || passwordDraft.isEmpty || isAuthenticating)
         }
         .padding()
         .prismGlass(cornerRadius: 16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
     }
 
     private func performAuth() {

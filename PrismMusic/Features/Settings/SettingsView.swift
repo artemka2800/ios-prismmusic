@@ -41,8 +41,12 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 14) {
                                 SecureField("Введи Yandex.Music token", text: $tokenDraft)
                                     .padding(12)
-                                    .background(Color.black.opacity(0.2))
+                                    .background(Color.white.opacity(0.04))
                                     .cornerRadius(10)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                                    )
                                     .foregroundStyle(.white)
                                     .tint(.white)
                                 
@@ -77,6 +81,10 @@ struct SettingsView: View {
                             }
                             .padding(14)
                             .prismGlass(cornerRadius: 16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                            )
                             
                             Text("Без токена доступен только SoundCloud. Токен хранится в Keychain устройства, бэкенд получает его одноразово в каждом запросе стрима.")
                                 .font(Theme.Typography.caption)
@@ -104,6 +112,10 @@ struct SettingsView: View {
                             }
                             .padding(14)
                             .prismGlass(cornerRadius: 16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                            )
                             
                             Text("Immersive фон подкрашивает фон приложения цветом текущей обложки.")
                                 .font(Theme.Typography.caption)
@@ -140,6 +152,10 @@ struct SettingsView: View {
                             }
                             .padding(14)
                             .prismGlass(cornerRadius: 16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                            )
                         }
                         
                         // Save Button
@@ -159,8 +175,13 @@ struct SettingsView: View {
                                 Spacer()
                             }
                             .padding()
-                            .prismGlass(cornerRadius: 16, tint: .white.opacity(0.1))
+                            .prismGlass(cornerRadius: 16, tint: savedFlash ? Color.green.opacity(0.12) : Color.white.opacity(0.06))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(savedFlash ? Color.green.opacity(0.3) : Color.white.opacity(0.12), lineWidth: 0.5)
+                            )
                         }
+                        .buttonStyle(.plain)
                         .disabled(savedFlash)
                         .padding(.top, 8)
                     }

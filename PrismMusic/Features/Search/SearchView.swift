@@ -70,7 +70,12 @@ struct SearchView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .prismGlass(cornerRadius: 12)
+        .prismGlassCapsule()
+        .overlay(
+            Capsule()
+                .stroke(fieldFocused ? Color.white.opacity(0.24) : Color.white.opacity(0.08), lineWidth: 0.5)
+        )
+        .animation(.easeOut(duration: 0.15), value: fieldFocused)
         .padding(.horizontal, Theme.Layout.screenInset)
         .padding(.top, 14)
         .padding(.bottom, 10)

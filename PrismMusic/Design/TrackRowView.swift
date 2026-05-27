@@ -29,6 +29,10 @@ struct TrackRowView: View {
                 }
                 .frame(width: 50, height: 50)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                )
                 .overlay(alignment: .center) {
                     if isPlaying {
                         Image(systemName: "waveform")
@@ -89,6 +93,18 @@ struct TrackRowView: View {
             .padding(.vertical, 8)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TrackRowButtonStyle())
+    }
+}
+
+struct TrackRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.07 : 0.0))
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
