@@ -10,12 +10,13 @@ import Foundation
 
 enum APIConfig {
     /// Default PrismMusic backend URL.
-    ///
-    /// Replace this with your deployed Next.js URL (e.g. `https://prism.example.com`).
-    /// For local development on macOS while running `pnpm dev`, set this to
-    /// `http://YOUR_MAC_LAN_IP:3000` (the simulator can't reach `localhost`
-    /// from a physical device).
-    static let defaultBackendURL = "https://prism-music-one.vercel.app"
+    static let defaultBackendURL = "https://pm.standrise.net"
+
+    /// Pre-configured PrismMusic backend hosts. The first one is the main host.
+    static let hosts = [
+        "https://pm.standrise.net",
+        "https://prism-music-one.vercel.app"
+    ]
 
     /// Request timeout for all API calls in seconds.
     static let timeoutSeconds: TimeInterval = 20

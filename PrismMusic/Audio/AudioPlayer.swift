@@ -22,7 +22,6 @@ import MediaPlayer
 import Observation
 import SwiftUI
 import UIKit
-import WidgetKit
 
 @Observable
 @MainActor
@@ -42,12 +41,8 @@ final class AudioPlayer {
     private(set) var trackChangeDirection: TrackChangeDirection = .none
     private var transitionTask: Task<Void, Never>?
 
-    // Cache properties for Widget Updates to prevent throttling
-    private var lastWidgetTrackId: String? = nil
-    private var lastWidgetIsPlaying: Bool? = nil
-    private var lastWidgetLyricsLines: [String]? = nil
-    private var lastWidgetLyricLineIndex: Int? = nil
     private var hasTriggeredAutoNext: Bool = false
+    private var trackLoadRetryCount = 0
 
     var errorMessage: String? = nil
     var showError: Bool = false
@@ -109,9 +104,6 @@ final class AudioPlayer {
         attachEndNotification()
         // Volume mirror for Now Playing.
         storedVolume = player.volume
-        
-        // Sync widget state on app launch
-        updateWidgetState(force: true)
     }
 
     /// Replace the queue and start playing the first track.
@@ -133,7 +125,6 @@ final class AudioPlayer {
             isPlaying = true
         }
         updateNowPlaying()
-        updateWidgetState()
     }
 
     func next(isAutomatic: Bool = false) {
@@ -196,7 +187,6 @@ final class AudioPlayer {
                 guard let self else { return }
                 self.progress = seconds
                 self.updateNowPlaying()
-                self.updateWidgetState(force: true)
             }
         }
     }
@@ -226,17 +216,16 @@ final class AudioPlayer {
 
     // MARK: - Load track
 
-    private func load(track: Track, autoplay: Bool, isAutomatic: Bool = false) {
+    private func load(track: Track, autoplay: Bool, isAutomatic: Bool = false, isRetry: Bool = false) {
+        if !isRetry {
+            trackLoadRetryCount = 0
+        }
         currentTrack = track
         progress = 0
         duration = track.durationSeconds ?? 0
         isBuffering = true
         lyrics = nil
-        lastWidgetLyricLineIndex = nil
         hasTriggeredAutoNext = false
-
-        // Update widget metadata immediately
-        updateWidgetState(force: true)
 
         // Build the proxied stream URL — this is what AVPlayer fetches.
         guard let url = api.streamURL(for: track) else {
@@ -281,7 +270,6 @@ final class AudioPlayer {
                 newPlayer.play()
                 self.isPlaying = true
             }
-            self.updateWidgetState(force: true)
             performCrossfade(oldPlayer: oldPlayer, newPlayer: newPlayer)
         } else {
             // Cancel transition first
@@ -296,7 +284,6 @@ final class AudioPlayer {
                 newPlayer.play()
                 self.isPlaying = true
             }
-            self.updateWidgetState(force: true)
         }
 
         Task { await fetchLyrics(for: track) }
@@ -360,8 +347,24 @@ final class AudioPlayer {
                     self.errorMessage = "Ошибка воспроизведения: \(msg)"
                     self.showError = true
                     self.isBuffering = false
-                    // Auto-skip to next track on failure
-                    self.next()
+                    
+                    // Rotate backend host and retry playback if retry count not exceeded
+                    if self.trackLoadRetryCount < APIConfig.hosts.count {
+                        self.trackLoadRetryCount += 1
+                        print("[AudioPlayer] Rotating host and retrying playback (attempt \(self.trackLoadRetryCount) of \(APIConfig.hosts.count))...")
+                        self.api.rotateHost()
+                        if let track = self.currentTrack {
+                            self.load(track: track, autoplay: self.isPlaying, isRetry: true)
+                        } else {
+                            self.next()
+                        }
+                    } else {
+                        // Reset count and skip to next track
+                        self.trackLoadRetryCount = 0
+                        self.errorMessage = "Не удалось воспроизвести трек ни на одном из доступных серверов."
+                        self.showError = true
+                        self.next()
+                    }
                 default:
                     break
                 }
@@ -402,15 +405,6 @@ final class AudioPlayer {
                 if remaining > 0 && remaining <= 3.0 && !self.hasTriggeredAutoNext && self.repeatMode != .one && self.hasNextTrack && self.duration > 10 {
                     self.hasTriggeredAutoNext = true
                     self.next(isAutomatic: true)
-                }
-                
-                // Only trigger widget updates in the time observer if the active lyric line changes
-                if let lyrics = self.lyrics, lyrics.isSynced {
-                    let activeIndex = lyrics.lines.lastIndex(where: { $0.time <= seconds }) ?? -1
-                    if activeIndex != self.lastWidgetLyricLineIndex {
-                        self.lastWidgetLyricLineIndex = activeIndex
-                        self.updateWidgetState()
-                    }
                 }
                 
                 // Refresh Now Playing occasionally
@@ -489,101 +483,11 @@ final class AudioPlayer {
         )
     }
 
-    // MARK: - Widget State Sync
-
-    func updateWidgetState(force: Bool = false) {
-        let defaults = UserDefaults.appGroup
-        
-        let title = currentTrack?.title ?? "Не воспроизводится"
-        let artist = currentTrack?.artist ?? ""
-        let album = currentTrack?.album ?? ""
-        let source = currentTrack?.source?.rawValue ?? ""
-        let isPlaying = self.isPlaying
-        let artworkURL = currentTrack?.artworkURL?.absoluteString ?? ""
-        let progress = self.progress
-        let duration = self.duration
-        let lastUpdated = Date.now.timeIntervalSince1970
-        
-        var lyricsLines: [String] = []
-        if let lyrics = self.lyrics, lyrics.isSynced {
-            let t = self.progress
-            if let activeIndex = lyrics.lines.lastIndex(where: { $0.time <= t }) {
-                for offset in 0..<8 {
-                    let idx = activeIndex + offset
-                    if idx < lyrics.lines.count {
-                        lyricsLines.append(lyrics.lines[idx].text)
-                    }
-                }
-            } else {
-                for idx in 0..<min(8, lyrics.lines.count) {
-                    lyricsLines.append(lyrics.lines[idx].text)
-                }
-            }
-        } else if let lyrics = self.lyrics {
-            for idx in 0..<min(8, lyrics.lines.count) {
-                lyricsLines.append(lyrics.lines[idx].text)
-            }
-        }
-        
-        // Write playback state to UserDefaults on every update so that even if we don't
-        // trigger a timeline reload (to avoid throttling), the values are ready in UserDefaults
-        // when WidgetKit decides to fetch a new timeline entry.
-        defaults?.set(title, forKey: "widget.track.title")
-        defaults?.set(artist, forKey: "widget.track.artist")
-        defaults?.set(album, forKey: "widget.track.album")
-        defaults?.set(source, forKey: "widget.track.source")
-        defaults?.set(isPlaying, forKey: "widget.track.isPlaying")
-        defaults?.set(lyricsLines, forKey: "widget.track.lyricsLines")
-        defaults?.set(artworkURL, forKey: "widget.track.artworkURL")
-        defaults?.set(progress, forKey: "widget.track.progress")
-        defaults?.set(duration, forKey: "widget.track.duration")
-        defaults?.set(lastUpdated, forKey: "widget.track.lastUpdated")
-        defaults?.synchronize()
-        
-        // Write state to Keychain so widget can read it even without App Groups
-        let state = WidgetTrackState(
-            title: title,
-            artist: artist,
-            source: source,
-            isPlaying: isPlaying,
-            lyricsLines: lyricsLines,
-            artworkURL: artworkURL,
-            progress: progress,
-            duration: duration,
-            lastUpdated: lastUpdated
-        )
-        if let jsonData = try? JSONEncoder().encode(state),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            KeychainStore.set(jsonString, for: "widget.track.state")
-        }
-        
-        if defaults == nil {
-            DebugLogger.shared.append("[WidgetSync] ⚠️ Warning: UserDefaults.appGroup is nil! Succeeded in writing to Keychain as fallback.")
-        } else {
-            DebugLogger.shared.append("[WidgetSync] Success: Syncing '\(title)' (\(artist)) [playing: \(isPlaying), progress: \(Int(progress))/\(Int(duration))s]")
-        }
-
-        let trackId = currentTrack?.id
-        if !force &&
-            trackId == lastWidgetTrackId &&
-            isPlaying == lastWidgetIsPlaying &&
-            lyricsLines == lastWidgetLyricsLines {
-            return
-        }
-        
-        lastWidgetTrackId = trackId
-        lastWidgetIsPlaying = isPlaying
-        lastWidgetLyricsLines = lyricsLines
-        
-        WidgetCenter.shared.reloadAllTimelines()
-    }
-
     // MARK: - Lyrics
 
     private func fetchLyrics(for track: Track) async {
         if let cached = lyricsCache.value(for: track) {
             self.lyrics = cached
-            self.updateWidgetState(force: true)
             return
         }
         do {
@@ -602,42 +506,10 @@ final class AudioPlayer {
             // Only commit if the user hasn't already changed tracks while we waited.
             if currentTrack?.id == track.id {
                 self.lyrics = parsed
-                self.updateWidgetState(force: true)
             }
         } catch {
             // Soft-fail — leave lyrics nil; UI shows "no lyrics" placeholder.
         }
     }
 
-}
-
-extension UserDefaults {
-    static var appGroup: UserDefaults? {
-        // Dynamically compute the App Group suite name from the host app bundle ID.
-        // During sideloading, tools like Sideloadly modify the bundle ID (e.g. to com.sideloadly.prism.music),
-        // and also rename the App Group capability to match. Hardcoded IDs would fail to match.
-        let bundleId = Bundle.main.bundleIdentifier ?? "com.prism.music"
-        var components = bundleId.components(separatedBy: ".")
-        
-        // Remove common target suffixes to get the base identifier
-        if let last = components.last, last.lowercased().contains("widget") || last.lowercased().contains("activity") {
-            components.removeLast()
-        }
-        
-        let baseId = components.joined(separator: ".")
-        let groupName = "group.\(baseId)"
-        return UserDefaults(suiteName: groupName)
-    }
-}
-
-struct WidgetTrackState: Codable {
-    let title: String
-    let artist: String
-    let source: String
-    let isPlaying: Bool
-    let lyricsLines: [String]
-    let artworkURL: String
-    let progress: Double
-    let duration: Double
-    let lastUpdated: Double
 }

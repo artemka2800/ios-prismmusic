@@ -119,12 +119,17 @@ struct PlaylistDetailView: View {
                     if let source = album.source {
                         Text("·")
                             .foregroundStyle(Theme.Palette.textTertiary)
-                        Text(source.label)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.Palette.textTertiary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                        HStack(spacing: 4) {
+                            Image(systemName: source.iconName)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(source.iconColor)
+                            Text(source.label)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.Palette.textTertiary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
                     }
                 }
             }

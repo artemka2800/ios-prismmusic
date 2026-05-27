@@ -50,6 +50,9 @@ struct TrackRowView: View {
                             .lineLimit(1)
                         if let source = track.source {
                             Text("·")
+                            Image(systemName: source.iconName)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(source.iconColor)
                             Text(source.label)
                                 .foregroundStyle(Theme.Palette.textTertiary)
                         }

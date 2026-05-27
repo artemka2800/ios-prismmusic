@@ -341,11 +341,16 @@ struct NowPlayingView: View {
     private var trackInfo: some View {
         VStack(spacing: 4) {
             if let source = app.audio.currentTrack?.source {
-                Text(source.label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Theme.Palette.textTertiary)
-                    .padding(.bottom, 4)
+                HStack(spacing: 4) {
+                    Image(systemName: source.iconName)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(source.iconColor)
+                    Text(source.label)
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(2)
+                        .foregroundStyle(Theme.Palette.textTertiary)
+                }
+                .padding(.bottom, 4)
             }
             Text(app.audio.currentTrack?.title ?? "Ничего не выбрано")
                 .font(.system(size: 22, weight: .bold))

@@ -44,9 +44,7 @@ targets:
     resources:
       - path: PrismMusic/Assets.xcassets
         optional: true
-    dependencies:
-      - target: PrismMusicWidget
-        embed: true
+
     info:
       path: PrismMusic/Info.plist
       properties:
@@ -80,28 +78,5 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
-  PrismMusicWidget:
-    type: app-extension
-    platform: iOS
-    entitlements:
-      path: PrismMusicWidget/PrismMusicWidget.entitlements
-    sources:
-      - path: PrismMusicWidget
-        excludes:
-          - "**/*.md"
-    info:
-      path: PrismMusicWidget/Info.plist
-      properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-        CFBundleDisplayName: PrismMusicWidget
-        CFBundleShortVersionString: "$(MARKETING_VERSION)"
-        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.prism.music.prismmusicwidget
-        TARGETED_DEVICE_FAMILY: "1,2"
-        APPLICATION_EXTENSION_API_ONLY: YES
-        SKIP_INSTALL: YES
-        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
+
 
