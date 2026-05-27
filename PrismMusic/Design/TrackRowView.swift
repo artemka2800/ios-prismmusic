@@ -50,8 +50,18 @@ struct TrackRowView: View {
                             .lineLimit(1)
                         if let source = track.source {
                             Text("·")
-                            Text(source.label)
-                                .foregroundStyle(Theme.Palette.textTertiary)
+                            if source.hasCustomIcon {
+                                Image(source.rawValue)
+                                    .resizable()
+                                    .renderingMode(.template)
+                                    .scaledToFit()
+                                    .frame(width: 11, height: 11)
+                                    .foregroundStyle(Theme.Palette.textTertiary)
+                            } else {
+                                Image(systemName: "music.note")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Theme.Palette.textTertiary)
+                            }
                         }
                     }
                     .font(.system(size: 12))

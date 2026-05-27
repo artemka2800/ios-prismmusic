@@ -115,17 +115,6 @@ struct PlaylistDetailView: View {
                     Text(album.artist)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Theme.Palette.textSecondary)
-
-                    if let source = album.source {
-                        Text("·")
-                            .foregroundStyle(Theme.Palette.textTertiary)
-                        Text(source.label)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.Palette.textTertiary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
-                    }
                 }
             }
         }
