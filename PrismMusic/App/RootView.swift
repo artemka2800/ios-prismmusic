@@ -31,7 +31,7 @@ struct RootView: View {
                     .foregroundStyle(.white)
                     .padding(.vertical, 8)
                     .background(Color.red.opacity(0.85))
-                    .transition(.move(edge: .top).combined(.opacity))
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 
                 TabRoot()

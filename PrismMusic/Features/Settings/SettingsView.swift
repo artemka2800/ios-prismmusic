@@ -385,7 +385,9 @@ struct RealTimeLogsView: View {
             loadLogs()
             // Refresh logs every second
             timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-                loadLogs()
+                DispatchQueue.main.async {
+                    loadLogs()
+                }
             }
         }
         .onDisappear {
