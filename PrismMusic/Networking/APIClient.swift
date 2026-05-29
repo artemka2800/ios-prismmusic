@@ -89,7 +89,7 @@ final class APIClient {
             URLQueryItem(name: "id", value: track.id),
             URLQueryItem(name: "source", value: track.source?.rawValue ?? "soundcloud"),
         ]
-        if track.source == .yandex, !settings.yandexToken.isEmpty {
+        if !settings.yandexToken.isEmpty {
             items.append(URLQueryItem(name: "token", value: settings.yandexToken))
         }
         components.queryItems = items
