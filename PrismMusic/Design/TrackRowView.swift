@@ -11,6 +11,7 @@
 import SwiftUI
 
 struct TrackRowView: View {
+    @Environment(AppState.self) private var app
     let track: Track
     let isPlaying: Bool
     var onTap: () -> Void
@@ -94,6 +95,53 @@ struct TrackRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(TrackRowButtonStyle())
+        .contextMenu {
+            if app.networkMonitor.isConnected {
+                if track.source == .yandex {
+                    Button {
+                        Task {
+                            await app.findAndReplace(track: track, targetSource: .spotify)
+                        }
+                    } label: {
+                        Label("Найти на Spotify", systemImage: "magnifyingglass")
+                    }
+                } else if track.source == .spotify {
+                    Button {
+                        Task {
+                            await app.findAndReplace(track: track, targetSource: .yandex)
+                        }
+                    } label: {
+                        Label("Найти в Яндекс.Музыке", systemImage: "magnifyingglass")
+                    }
+                } else if track.source == .soundcloud {
+                    Button {
+                        Task {
+                            await app.findAndReplace(track: track, targetSource: .spotify)
+                        }
+                    } label: {
+                        Label("Найти на Spotify", systemImage: "magnifyingglass")
+                    }
+                    Button {
+                        Task {
+                            await app.findAndReplace(track: track, targetSource: .yandex)
+                        }
+                    } label: {
+                        Label("Найти в Яндекс.Музыке", systemImage: "magnifyingglass")
+                    }
+                }
+            }
+            
+            if let onLikeToggle {
+                Button {
+                    onLikeToggle()
+                } label: {
+                    Label(
+                        liked ? "Удалить из любимых" : "В любимые",
+                        systemImage: liked ? "heart.fill" : "heart"
+                    )
+                }
+            }
+        }
     }
 }
 

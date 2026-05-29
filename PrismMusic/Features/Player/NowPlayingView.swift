@@ -314,14 +314,60 @@ struct NowPlayingView: View {
 
             Spacer()
 
-            Button {
-                resetIdleTimer()
+            Menu {
+                if app.networkMonitor.isConnected, let track = app.audio.currentTrack {
+                    if track.source == .yandex {
+                        Button {
+                            Task {
+                                await app.findAndReplace(track: track, targetSource: .spotify)
+                            }
+                        } label: {
+                            Label("Найти на Spotify", systemImage: "magnifyingglass")
+                        }
+                    } else if track.source == .spotify {
+                        Button {
+                            Task {
+                                await app.findAndReplace(track: track, targetSource: .yandex)
+                            }
+                        } label: {
+                            Label("Найти в Яндекс.Музыке", systemImage: "magnifyingglass")
+                        }
+                    } else if track.source == .soundcloud {
+                        Button {
+                            Task {
+                                await app.findAndReplace(track: track, targetSource: .spotify)
+                            }
+                        } label: {
+                            Label("Найти на Spotify", systemImage: "magnifyingglass")
+                        }
+                        Button {
+                            Task {
+                                await app.findAndReplace(track: track, targetSource: .yandex)
+                            }
+                        } label: {
+                            Label("Найти в Яндекс.Музыке", systemImage: "magnifyingglass")
+                        }
+                    }
+                }
+                
+                if let track = app.audio.currentTrack {
+                    let liked = app.library.isLiked(track)
+                    Button {
+                        app.audio.toggleLike()
+                    } label: {
+                        Label(
+                            liked ? "Удалить из любимых" : "В любимые",
+                            systemImage: liked ? "heart.fill" : "heart"
+                        )
+                    }
+                }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .semibold))
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }
+            .menuStyle(.button)
             .buttonStyle(GlassCircleButtonStyle())
         }
         .padding(.horizontal, Theme.Layout.screenInset)

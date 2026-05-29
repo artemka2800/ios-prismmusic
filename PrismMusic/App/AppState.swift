@@ -25,6 +25,8 @@ final class AppState {
     let library: LibraryStore
     let recommendations: RecommendationsStore
     let search: SearchStore
+    let networkMonitor: NetworkMonitor
+    let downloadStore: DownloadStore
 
     init() {
         let settings = SettingsStore()
@@ -36,5 +38,54 @@ final class AppState {
         self.recommendations = RecommendationsStore()
         self.search = SearchStore()
         self.audio = AudioPlayer(api: api, library: library)
+        self.networkMonitor = NetworkMonitor.shared
+        self.downloadStore = DownloadStore(api: api)
+    }
+
+    func findAndReplace(track: Track, targetSource: TrackSource) async {
+        do {
+            let results = try await api.findTrack(
+                title: track.title,
+                artist: track.artist,
+                targetSource: targetSource.rawValue
+            )
+            
+            guard let matchedTrack = results.first else {
+                audio.errorMessage = "Трек не найден на \(targetSource.label)"
+                audio.showError = true
+                return
+            }
+            
+            let newId = "\(targetSource.rawValue):\(matchedTrack.id)"
+            let replacedTrack = Track(
+                id: newId,
+                title: matchedTrack.title,
+                artist: matchedTrack.artist,
+                album: matchedTrack.album,
+                durationSeconds: matchedTrack.durationSeconds,
+                cover: matchedTrack.cover,
+                streamURL: matchedTrack.streamURL,
+                source: targetSource
+            )
+            
+            if library.isLiked(track) {
+                library.replaceTrack(track, with: replacedTrack)
+            }
+            
+            audio.replaceTrackInQueue(oldTrackId: track.id, with: replacedTrack)
+            
+            // If downloaded, delete old and download new
+            if downloadStore.isDownloaded(track.id) {
+                downloadStore.deleteTrack(track)
+                await downloadStore.downloadTrack(replacedTrack)
+            }
+            
+            audio.errorMessage = "Трек успешно заменен на \(targetSource.label)!"
+            audio.showError = true
+        } catch {
+            print("[AppState] Find and replace failed: \(error)")
+            audio.errorMessage = "Ошибка замены: \(error.localizedDescription)"
+            audio.showError = true
+        }
     }
 }

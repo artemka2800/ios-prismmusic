@@ -214,6 +214,20 @@ final class AudioPlayer {
         updateNowPlaying()
     }
 
+    func replaceTrackInQueue(oldTrackId: String, with newTrack: Track) {
+        if let idx = queue.firstIndex(where: { $0.id == oldTrackId }) {
+            queue[idx] = newTrack
+        }
+        
+        if currentTrack?.id == oldTrackId {
+            let savedProgress = progress
+            let wasPlaying = isPlaying
+            load(track: newTrack, autoplay: wasPlaying)
+            seek(to: savedProgress)
+        }
+        updateNowPlaying()
+    }
+
     // MARK: - Load track
 
     private func load(track: Track, autoplay: Bool, isAutomatic: Bool = false, isRetry: Bool = false) {
@@ -227,8 +241,23 @@ final class AudioPlayer {
         lyrics = nil
         hasTriggeredAutoNext = false
 
-        // Build the proxied stream URL — this is what AVPlayer fetches.
-        guard let url = api.streamURL(for: track) else {
+        // Check if track is downloaded locally
+        let trackURL: URL?
+        let safeId = track.id.replacingOccurrences(of: ":", with: "_")
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        if let docDir = paths.first {
+            let localPath = docDir.appendingPathComponent("PrismDownloads/\(safeId).mp3")
+            if FileManager.default.fileExists(atPath: localPath.path) {
+                trackURL = localPath
+                print("[AudioPlayer] Playing offline track from local URL: \(localPath)")
+            } else {
+                trackURL = api.streamURL(for: track)
+            }
+        } else {
+            trackURL = api.streamURL(for: track)
+        }
+        
+        guard let url = trackURL else {
             print("[AudioPlayer] ⚠️ streamURL returned nil for track: \(track.id)")
             self.errorMessage = "Не удалось получить URL для трека \(track.title)."
             self.showError = true

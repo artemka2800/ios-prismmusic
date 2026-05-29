@@ -27,7 +27,11 @@ struct SearchView: View {
                         .background(Color.white.opacity(0.06))
                         .padding(.top, 4)
 
-                    content
+                    if !app.networkMonitor.isConnected {
+                        offlinePlaceholder
+                    } else {
+                        content
+                    }
                 }
             }
             .navigationBarHidden(true)
@@ -237,5 +241,22 @@ struct SearchView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var offlinePlaceholder: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(Theme.Palette.textTertiary)
+            Text("Поиск недоступен")
+                .font(Theme.Typography.title)
+                .foregroundStyle(.white)
+            Text("Подключись к интернету, чтобы искать музыку на Яндекс.Музыке, SoundCloud и Spotify")
+                .font(Theme.Typography.secondary)
+                .foregroundStyle(Theme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 36)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

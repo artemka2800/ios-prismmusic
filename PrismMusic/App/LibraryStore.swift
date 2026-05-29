@@ -96,6 +96,26 @@ final class LibraryStore {
         return addedCount
     }
 
+    func replaceTrack(_ oldTrack: Track, with newTrack: Track) {
+        likedTrackIDs.remove(oldTrack.id)
+        likedTrackIDs.insert(newTrack.id)
+        
+        if let idx = likedTracks.firstIndex(where: { $0.id == oldTrack.id }) {
+            likedTracks[idx] = newTrack
+        }
+        persist()
+        
+        if let api, let settings, settings.isLoggedIn {
+            Task {
+                do {
+                    _ = try await api.replaceLikedTrack(oldTrackId: oldTrack.id, newTrack: newTrack)
+                } catch {
+                    print("[LibraryStore] Failed to replace liked track on server: \(error)")
+                }
+            }
+        }
+    }
+
     private func persist() {
         let defaults = UserDefaults.standard
         defaults.set(Array(likedTrackIDs), forKey: Keys.likedIDs)

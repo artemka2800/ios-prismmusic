@@ -19,7 +19,24 @@ struct RootView: View {
             Theme.Palette.background
                 .ignoresSafeArea()
 
-            TabRoot()
+            VStack(spacing: 0) {
+                if !app.networkMonitor.isConnected {
+                    HStack {
+                        Spacer()
+                        Image(systemName: "wifi.slash")
+                        Text("Отсутствует подключение к интернету")
+                            .font(.system(size: 13, weight: .semibold))
+                        Spacer()
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 8)
+                    .background(Color.red.opacity(0.85))
+                    .transition(.move(edge: .top).combined(.opacity))
+                }
+                
+                TabRoot()
+            }
+            .animation(.spring(), value: app.networkMonitor.isConnected)
 
             // Mini player docks above the tab bar. Tapping it opens the
             // full Now Playing modal.

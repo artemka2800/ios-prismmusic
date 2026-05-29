@@ -193,6 +193,55 @@ final class APIClient {
         return result.liked
     }
 
+    struct FindResponse: Decodable {
+        let results: [Track]
+    }
+
+    func findTrack(title: String, artist: String, targetSource: String) async throws -> [Track] {
+        let body: [String: Any] = [
+            "title": title,
+            "artist": artist,
+            "targetSource": targetSource
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        let response = try await executeWithFailover(
+            path: "/api/music/find",
+            method: "POST",
+            bodyData: bodyData,
+            as: FindResponse.self
+        )
+        return response.results
+    }
+
+    func replaceLikedTrack(oldTrackId: String, newTrack: Track) async throws -> Bool {
+        guard settings.isLoggedIn else { return false }
+        let trackDict: [String: Any] = [
+            "id": newTrack.id,
+            "title": newTrack.title,
+            "artist": newTrack.artist,
+            "coverUrl": newTrack.cover?.absoluteString ?? "",
+            "duration": Int(newTrack.durationSeconds ?? 0),
+            "source": newTrack.source?.rawValue ?? "unknown"
+        ]
+        let body: [String: Any] = [
+            "userId": settings.userId,
+            "oldTrackId": oldTrackId,
+            "newTrack": trackDict
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        
+        struct ReplaceResponse: Decodable {
+            let success: Bool
+        }
+        let result = try await executeWithFailover(
+            path: "/api/library/likes",
+            method: "PUT",
+            bodyData: bodyData,
+            as: ReplaceResponse.self
+        )
+        return result.success
+    }
+
     // MARK: - Failover & Request plumbing
 
     func rotateHost() {

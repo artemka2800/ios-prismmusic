@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var isImporting = false
     @State private var showImportAlert = false
     @State private var importAlertMessage = ""
+    @State private var isDownloadingAll = false
 
     var body: some View {
         NavigationStack {
@@ -86,7 +87,7 @@ struct SettingsView: View {
                                     .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
                             )
                             
-                            Text("Без токена доступен только SoundCloud. Токен хранится в Keychain устройства, бэкенд получает его одноразово в каждом запросе стрима.")
+                            Text("Без токена доступен только SoundCloud и Spotify. Токен хранится в Keychain устройства, бэкенд получает его одноразово в каждом запросе стрима.")
                                 .font(Theme.Typography.caption)
                                 .foregroundStyle(Theme.Palette.textTertiary)
                                 .padding(.horizontal, 4)
@@ -118,6 +119,82 @@ struct SettingsView: View {
                             )
                             
                             Text("Immersive фон подкрашивает фон приложения цветом текущей обложки.")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Palette.textTertiary)
+                                .padding(.horizontal, 4)
+                        }
+                        
+                        // Offline mode card
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Офлайн-режим")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.Palette.textSecondary)
+                                .padding(.horizontal, 4)
+                            
+                            VStack(alignment: .leading, spacing: 14) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Скачанные треки")
+                                            .foregroundStyle(.white)
+                                            .font(.system(size: 14, weight: .medium))
+                                        Text("\(app.downloadStore.downloadedTracks.count) треков сохранено локально")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(Theme.Palette.textTertiary)
+                                    }
+                                    Spacer()
+                                }
+                                
+                                if !app.downloadStore.downloadingTrackIDs.isEmpty || isDownloadingAll {
+                                    let downloadingCount = app.downloadStore.downloadingTrackIDs.count
+                                    HStack(spacing: 8) {
+                                        ProgressView()
+                                            .tint(.white)
+                                            .controlSize(.small)
+                                        Text(downloadingCount > 0 ? "Скачивание треков (\(downloadingCount) в очереди)..." : "Подготовка к скачиванию...")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.white.opacity(0.8))
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
+                                
+                                Button {
+                                    downloadAllTracks()
+                                } label: {
+                                    HStack {
+                                        Label("Скачать все треки", systemImage: "arrow.down.to.line.circle")
+                                            .foregroundStyle(.white)
+                                            .font(.system(size: 14, weight: .medium))
+                                        Spacer()
+                                    }
+                                }
+                                .disabled(!app.networkMonitor.isConnected || isDownloadingAll || !app.downloadStore.downloadingTrackIDs.isEmpty)
+                                
+                                Divider()
+                                    .background(Color.white.opacity(0.1))
+                                
+                                Button {
+                                    app.downloadStore.deleteAllTracks()
+                                } label: {
+                                    HStack {
+                                        Label("Удалить все скачанные треки", systemImage: "trash")
+                                            .foregroundStyle(.red)
+                                            .font(.system(size: 14, weight: .medium))
+                                        Spacer()
+                                    }
+                                }
+                                .disabled(app.downloadStore.downloadedTracks.isEmpty || isDownloadingAll || !app.downloadStore.downloadingTrackIDs.isEmpty)
+                            }
+                            .padding(14)
+                            .prismGlass(cornerRadius: 16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                            )
+                            
+                            Text("Скачанные треки будут доступны для воспроизведения в Медиатеке, даже если отсутствует интернет-подключение.")
                                 .font(Theme.Typography.caption)
                                 .foregroundStyle(Theme.Palette.textTertiary)
                                 .padding(.horizontal, 4)
@@ -250,6 +327,16 @@ struct SettingsView: View {
                 showImportAlert = true
             }
             isImporting = false
+        }
+    }
+
+    private func downloadAllTracks() {
+        guard app.networkMonitor.isConnected else { return }
+        isDownloadingAll = true
+        Task {
+            let tracksToDownload = app.library.likedTracks
+            await app.downloadStore.downloadAll(tracks: tracksToDownload)
+            isDownloadingAll = false
         }
     }
 

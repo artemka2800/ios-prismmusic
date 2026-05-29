@@ -24,7 +24,17 @@ struct Track: Identifiable, Hashable, Codable, Sendable {
     /// Provider tag used by the backend (`yandex`, `soundcloud`, etc).
     let source: TrackSource?
 
-    var artworkURL: URL? { proxyArtworkURL(cover) }
+    var artworkURL: URL? {
+        let safeId = id.replacingOccurrences(of: ":", with: "_")
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        if let docDir = paths.first {
+            let localCover = docDir.appendingPathComponent("PrismDownloads/\(safeId)_cover.jpg")
+            if FileManager.default.fileExists(atPath: localCover.path) {
+                return localCover
+            }
+        }
+        return proxyArtworkURL(cover)
+    }
 
     /// Convenience: human-readable duration string (`m:ss`).
     var durationLabel: String {

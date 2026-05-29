@@ -32,17 +32,21 @@ struct HomeView: View {
                         heroBanner
 
                         // Content
-                        switch app.recommendations.state {
-                        case .idle, .loading:
-                            loadingState
-                        case .failed(let message):
-                            errorState(message)
-                        case .loaded:
-                            VStack(alignment: .leading, spacing: 0) {
-                                tabSelector
-                                albumGrid
-                                if activeTab == .home {
-                                    recentlyPlayedSection
+                        if !app.networkMonitor.isConnected {
+                            offlinePlaceholder
+                        } else {
+                            switch app.recommendations.state {
+                            case .idle, .loading:
+                                loadingState
+                            case .failed(let message):
+                                errorState(message)
+                            case .loaded:
+                                VStack(alignment: .leading, spacing: 0) {
+                                    tabSelector
+                                    albumGrid
+                                    if activeTab == .home {
+                                        recentlyPlayedSection
+                                    }
                                 }
                             }
                         }
@@ -301,6 +305,23 @@ struct HomeView: View {
         }
     }
 
+    private var offlinePlaceholder: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(Theme.Palette.textTertiary)
+            Text("Отсутствует подключение")
+                .font(Theme.Typography.title)
+                .foregroundStyle(.white)
+            Text("Подключись к интернету, либо перейди во вкладку Медиатека, чтобы слушать загруженные треки")
+                .font(Theme.Typography.secondary)
+                .foregroundStyle(Theme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 36)
+        .padding(.top, 60)
+        .frame(maxWidth: .infinity)
+    }
 
 }
 
