@@ -55,6 +55,7 @@ final class AudioPlayer {
             if !isMuted {
                 player.volume = val
             }
+            NotificationCenter.default.post(name: .prismPlayerStateChanged, object: nil)
         }
     }
     private(set) var isMuted: Bool = false {
@@ -125,6 +126,7 @@ final class AudioPlayer {
             isPlaying = true
         }
         updateNowPlaying()
+        NotificationCenter.default.post(name: .prismPlayerStateChanged, object: nil)
     }
 
     func next(isAutomatic: Bool = false) {
@@ -187,6 +189,7 @@ final class AudioPlayer {
                 guard let self else { return }
                 self.progress = seconds
                 self.updateNowPlaying()
+                NotificationCenter.default.post(name: .prismPlayerSeekChanged, object: nil, userInfo: ["currentTime": seconds])
             }
         }
     }
@@ -226,6 +229,29 @@ final class AudioPlayer {
             seek(to: savedProgress)
         }
         updateNowPlaying()
+    }
+
+    func syncPlay(track: Track, autoplay: Bool) {
+        self.queue = [track]
+        self.currentIndex = 0
+        self.trackChangeDirection = .none
+        load(track: track, autoplay: autoplay)
+    }
+
+    func syncStop() {
+        player.pause()
+        isPlaying = false
+        currentTrack = nil
+        queue = []
+        currentIndex = 0
+        updateNowPlaying()
+        NotificationCenter.default.post(name: .prismPlayerStateChanged, object: nil)
+    }
+
+    func setPlaying(_ playing: Bool) {
+        if playing != isPlaying {
+            togglePlay()
+        }
     }
 
     // MARK: - Load track
@@ -318,6 +344,7 @@ final class AudioPlayer {
         Task { await fetchLyrics(for: track) }
 
         updateNowPlaying()
+        NotificationCenter.default.post(name: .prismPlayerStateChanged, object: nil)
     }
 
     private func performCrossfade(oldPlayer: AVPlayer, newPlayer: AVPlayer) {

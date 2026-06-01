@@ -22,6 +22,9 @@ final class RecommendationsStore {
 
     private(set) var state: State = .idle
     private(set) var albums: [Album] = []
+    
+    private(set) var dailyMixesState: State = .idle
+    private(set) var dailyMixes: [Album] = []
 
     /// Fires a fetch only if we don't already have data — idempotent.
     func loadIfNeeded(client: APIClient) async {
@@ -37,6 +40,22 @@ final class RecommendationsStore {
             state = .loaded
         } catch {
             state = .failed(error.localizedDescription)
+        }
+    }
+    
+    func loadDailyMixesIfNeeded(client: APIClient, userId: String) async {
+        if case .loaded = dailyMixesState, !dailyMixes.isEmpty { return }
+        await refreshDailyMixes(client: client, userId: userId)
+    }
+    
+    func refreshDailyMixes(client: APIClient, userId: String) async {
+        dailyMixesState = .loading
+        do {
+            let mixes = try await client.dailyMixes(userId: userId)
+            dailyMixes = mixes
+            dailyMixesState = .loaded
+        } catch {
+            dailyMixesState = .failed(error.localizedDescription)
         }
     }
 }

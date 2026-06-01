@@ -242,6 +242,33 @@ final class APIClient {
         return result.success
     }
 
+    /// `GET /api/music/mix?userId=...`
+    func dailyMixes(userId: String) async throws -> [Album] {
+        let response = try await executeWithFailover(
+            path: "/api/music/mix",
+            queryItems: [URLQueryItem(name: "userId", value: userId)],
+            as: DailyMixesResponse.self
+        )
+        return response.mixes
+    }
+
+    /// `POST /api/user/sync`
+    func syncState(userId: String, clientId: String, type: String, payload: Any) async throws {
+        let body: [String: Any] = [
+            "userId": userId,
+            "clientId": clientId,
+            "type": type,
+            "payload": payload
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        _ = try await executeWithFailover(
+            path: "/api/user/sync",
+            method: "POST",
+            bodyData: bodyData,
+            as: SyncResponse.self
+        )
+    }
+
     // MARK: - Failover & Request plumbing
 
     func rotateHost() {

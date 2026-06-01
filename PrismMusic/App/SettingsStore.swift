@@ -30,7 +30,10 @@ final class SettingsStore {
     /// Yandex.Music OAuth token. Stored in Keychain, not UserDefaults.
     /// Required to play Yandex-sourced tracks; SoundCloud works without it.
     var yandexToken: String {
-        didSet { KeychainStore.set(yandexToken, for: Keys.yandexToken) }
+        didSet {
+            KeychainStore.set(yandexToken, for: Keys.yandexToken)
+            NotificationCenter.default.post(name: .prismSettingsChanged, object: nil)
+        }
     }
 
     // MARK: - UI
@@ -39,6 +42,7 @@ final class SettingsStore {
     var immersiveMode: Bool {
         didSet {
             UserDefaults.standard.set(immersiveMode, forKey: Keys.immersiveMode)
+            NotificationCenter.default.post(name: .prismSettingsChanged, object: nil)
         }
     }
 
@@ -55,6 +59,7 @@ final class SettingsStore {
     var userId: String {
         didSet {
             UserDefaults.standard.set(userId, forKey: Keys.userId)
+            NotificationCenter.default.post(name: .prismUserSessionChanged, object: nil)
         }
     }
 
@@ -95,4 +100,11 @@ final class SettingsStore {
         static let userId = "prism.userId"
         static let username = "prism.username"
     }
+}
+
+extension Notification.Name {
+    static let prismUserSessionChanged = Notification.Name("prismUserSessionChanged")
+    static let prismPlayerStateChanged = Notification.Name("prismPlayerStateChanged")
+    static let prismPlayerSeekChanged = Notification.Name("prismPlayerSeekChanged")
+    static let prismSettingsChanged = Notification.Name("prismSettingsChanged")
 }

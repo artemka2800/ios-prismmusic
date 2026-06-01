@@ -31,6 +31,7 @@ struct PrismMusicApp: App {
                     // Kick off one-time initialisation here: audio session,
                     // remote command handlers, Live Activity recovery.
                     appState.audio.bootstrap()
+                    appState.sync.bootstrap()
                     await appState.recommendations.loadIfNeeded(client: appState.api)
                     await appState.library.syncWithServer()
                 }

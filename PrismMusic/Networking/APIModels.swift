@@ -163,3 +163,34 @@ struct UserResponse: Codable, Sendable {
     let createdAt: String?
 }
 
+/// `GET /api/music/mix` — daily mixes response
+struct DailyMixesResponse: Decodable, Sendable {
+    let mixes: [Album]
+}
+
+/// Dynamic payload structures for Cross-Device Sync
+struct SyncResponse: Decodable, Sendable {
+    let success: Bool?
+    let error: String?
+}
+
+struct SyncMessage: Decodable, Sendable {
+    let clientId: String
+    let type: String // "player", "settings", "token"
+}
+
+struct PlayerSyncPayload: Codable, Sendable {
+    let track: Track?
+    let isPlaying: Bool?
+    let volume: Float?
+    let currentTime: Double?
+    let timestamp: Double?
+}
+
+struct SettingsSyncPayload: Codable, Sendable {
+    let theme: String?
+    let immersive: Bool?
+    let yandexToken: String?
+}
+
+

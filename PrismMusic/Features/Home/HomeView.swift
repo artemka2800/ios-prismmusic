@@ -17,7 +17,7 @@ struct HomeView: View {
     @Namespace private var tabNamespace
 
     enum HomeTab {
-        case home, hot
+        case home, hot, mix
     }
 
     var body: some View {
@@ -43,9 +43,13 @@ struct HomeView: View {
                             case .loaded:
                                 VStack(alignment: .leading, spacing: 0) {
                                     tabSelector
-                                    albumGrid
-                                    if activeTab == .home {
-                                        recentlyPlayedSection
+                                    if activeTab == .mix {
+                                        dailyMixesSection
+                                    } else {
+                                        albumGrid
+                                        if activeTab == .home {
+                                            recentlyPlayedSection
+                                        }
                                     }
                                 }
                             }
@@ -56,7 +60,13 @@ struct HomeView: View {
                 .ignoresSafeArea(edges: .top)
                 .scrollIndicators(.hidden)
                 .refreshable {
-                    await app.recommendations.refresh(client: app.api)
+                    if activeTab == .mix {
+                        if app.settings.isLoggedIn {
+                            await app.recommendations.refreshDailyMixes(client: app.api, userId: app.settings.userId)
+                        }
+                    } else {
+                        await app.recommendations.refresh(client: app.api)
+                    }
                 }
             }
             .navigationBarHidden(true)
@@ -240,6 +250,29 @@ struct HomeView: View {
                 }
             }
             .buttonStyle(.plain)
+
+            Button {
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.76)) {
+                    activeTab = .mix
+                }
+            } label: {
+                VStack(spacing: 6) {
+                    Text("Микс")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(activeTab == .mix ? .white : .white.opacity(0.45))
+                    
+                    if activeTab == .mix {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.white)
+                            .frame(width: 20, height: 3)
+                            .matchedGeometryEffect(id: "activeTabUnderline", in: tabNamespace)
+                    } else {
+                        Color.clear
+                            .frame(width: 20, height: 3)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, Theme.Layout.screenInset)
         .padding(.top, 16)
@@ -320,6 +353,79 @@ struct HomeView: View {
         }
         .padding(.horizontal, 36)
         .padding(.top, 60)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var dailyMixesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Ваш персональный микс")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, Theme.Layout.screenInset)
+            
+            Text("Подборки треков, составленные на основе ваших любимых жанров и предпочтений. Обновляются ежедневно.")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(Theme.Palette.textSecondary)
+                .padding(.horizontal, Theme.Layout.screenInset)
+                .padding(.bottom, 8)
+            
+            if !app.settings.isLoggedIn {
+                authRequiredPlaceholder
+            } else {
+                switch app.recommendations.dailyMixesState {
+                case .idle, .loading:
+                    ProgressView()
+                        .tint(.white)
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                case .failed(let msg):
+                    errorState(msg)
+                case .loaded:
+                    if app.recommendations.dailyMixes.isEmpty {
+                        Text("Нет миксов")
+                            .font(Theme.Typography.secondary)
+                            .foregroundStyle(Theme.Palette.textSecondary)
+                            .frame(maxWidth: .infinity, minHeight: 120)
+                    } else {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 14),
+                                GridItem(.flexible(), spacing: 14)
+                            ],
+                            spacing: 18
+                        ) {
+                            ForEach(app.recommendations.dailyMixes) { album in
+                                AlbumCardView(album: album)
+                            }
+                        }
+                        .padding(.horizontal, Theme.Layout.screenInset)
+                    }
+                }
+            }
+        }
+        .padding(.top, 8)
+        .task(id: activeTab) {
+            if activeTab == .mix, app.settings.isLoggedIn {
+                await app.recommendations.loadDailyMixesIfNeeded(client: app.api, userId: app.settings.userId)
+            }
+        }
+    }
+
+    private var authRequiredPlaceholder: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "heart.text.square.fill")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(.red.opacity(0.8))
+            Text("Войдите в аккаунт")
+                .font(Theme.Typography.title)
+                .foregroundStyle(.white)
+            Text("Авторизуйтесь в PrismMusic, чтобы мы могли составить ваши индивидуальные Дневные Миксы.")
+                .font(Theme.Typography.secondary)
+                .foregroundStyle(Theme.Palette.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 36)
+        .padding(.top, 40)
         .frame(maxWidth: .infinity)
     }
 
