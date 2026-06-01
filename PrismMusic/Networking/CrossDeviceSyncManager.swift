@@ -90,6 +90,10 @@ final class CrossDeviceSyncManager {
         let userId = settings.userId
         print("[Sync] Starting cross-device sync for user: \(userId)")
         
+        Task {
+            await restorePlayerState(userId: userId)
+        }
+        
         sseTask = Task {
             while !Task.isCancelled {
                 await connectSSE(userId: userId)
@@ -97,6 +101,40 @@ final class CrossDeviceSyncManager {
                 // Wait 5 seconds before reconnecting on failure
                 try? await Task.sleep(for: .seconds(5))
             }
+        }
+    }
+
+    private func restorePlayerState(userId: String) async {
+        isApplyingRemote = true
+        defer {
+            Task {
+                try? await Task.sleep(for: .seconds(0.8))
+                isApplyingRemote = false
+            }
+        }
+        
+        do {
+            if let payload = try await api.fetchPlayerState(userId: userId) {
+                print("[Sync] Restoring remote player state on startup...")
+                // Sync track
+                if let track = payload.track {
+                    audio.syncPlay(track: track, autoplay: payload.isPlaying ?? false)
+                }
+                // Sync volume
+                if let volume = payload.volume, volume != audio.volume {
+                    audio.volume = volume
+                }
+                // Sync play/pause
+                if let isPlaying = payload.isPlaying, isPlaying != audio.isPlaying {
+                    audio.setPlaying(isPlaying)
+                }
+                // Sync currentTime
+                if let currentTime = payload.currentTime {
+                    audio.seek(to: currentTime)
+                }
+            }
+        } catch {
+            print("[Sync] Failed to restore player state: \(error)")
         }
     }
     

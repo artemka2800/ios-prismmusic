@@ -175,6 +175,20 @@ final class LibraryStore {
         }
     }
 
+    func updatePlaylist(playlistId: String, name: String, description: String, coverUrl: String) async -> Album? {
+        guard let api, let settings, settings.isLoggedIn else { return nil }
+        do {
+            let updated = try await api.updatePlaylist(playlistId: playlistId, name: name, description: description, coverUrl: coverUrl)
+            if let idx = playlists.firstIndex(where: { $0.id == playlistId }) {
+                playlists[idx] = updated
+            }
+            return updated
+        } catch {
+            print("[LibraryStore] Failed to update playlist: \(error)")
+            return nil
+        }
+    }
+
     private func persist() {
         let defaults = UserDefaults.standard
         defaults.set(Array(likedTrackIDs), forKey: Keys.likedIDs)

@@ -122,30 +122,30 @@ struct LibraryView: View {
     }
 
     private var pickerSection: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 0) {
             ForEach(LibraryTab.allCases) { tab in
-                Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                        activeTab = tab
+                Text(tab.rawValue)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(activeTab == tab ? .black : .white.opacity(0.7))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(
+                        activeTab == tab ? Color.white : Color.clear,
+                        in: Capsule()
+                    )
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                            activeTab = tab
+                        }
                     }
-                } label: {
-                    Text(tab.rawValue)
-                        .font(.system(size: 14, weight: .semibold))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .foregroundStyle(activeTab == tab ? .black : .white)
-                        .background(
-                            activeTab == tab ? Color.white : Color.white.opacity(0.06),
-                            in: Capsule()
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(activeTab == tab ? Color.clear : Color.white.opacity(0.08), lineWidth: 0.5)
-                        )
-                }
-                .buttonStyle(.plain)
             }
         }
+        .padding(4)
+        .background(Color.white.opacity(0.06), in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
         .padding(.horizontal, Theme.Layout.screenInset)
     }
 

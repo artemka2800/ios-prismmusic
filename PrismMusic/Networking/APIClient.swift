@@ -343,6 +343,39 @@ final class APIClient {
         return response.toAlbum
     }
 
+    /// `PATCH /api/library/playlists`
+    func updatePlaylist(playlistId: String, name: String, description: String, coverUrl: String) async throws -> Album {
+        let body: [String: Any] = [
+            "id": playlistId,
+            "name": name,
+            "description": description,
+            "coverUrl": coverUrl
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        let response = try await executeWithFailover(
+            path: "/api/library/playlists",
+            method: "PATCH",
+            bodyData: bodyData,
+            as: UserPlaylistDTO.self
+        )
+        return response.toAlbum
+    }
+
+    /// `GET /api/user/state?userId=...`
+    func fetchPlayerState(userId: String) async throws -> PlayerSyncPayload? {
+        do {
+            let response = try await executeWithFailover(
+                path: "/api/user/state",
+                queryItems: [URLQueryItem(name: "userId", value: userId)],
+                as: PlayerSyncPayload.self
+            )
+            return response
+        } catch {
+            print("[APIClient] Failed to fetch player state: \(error)")
+            return nil
+        }
+    }
+
     /// `POST /api/user/sync`
     func syncState(userId: String, clientId: String, type: String, payload: Any) async throws {
         let body: [String: Any] = [

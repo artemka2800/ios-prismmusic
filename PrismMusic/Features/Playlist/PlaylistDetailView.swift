@@ -18,10 +18,22 @@ struct PlaylistDetailView: View {
     @State private var isLoading = false
     @State private var errorMessage: String? = nil
 
+    @State private var playlistTitle: String = ""
+    @State private var playlistDescription: String = ""
+    @State private var playlistCoverURL: URL? = nil
+    @State private var isShowingEditSheet = false
+
+    init(album: Album) {
+        self.album = album
+        _playlistTitle = State(initialValue: album.title)
+        _playlistDescription = State(initialValue: album.artist)
+        _playlistCoverURL = State(initialValue: album.artworkURL)
+    }
+
     var body: some View {
         ZStack {
             // Immersive background matching NowPlayingView style
-            Backdrop(coverURL: album.artworkURL)
+            Backdrop(coverURL: playlistCoverURL)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -72,11 +84,36 @@ struct PlaylistDetailView: View {
             .padding(.leading, Theme.Layout.screenInset)
             .padding(.top, 52)
         }
+        .overlay(alignment: .topTrailing) {
+            if album.source == .other {
+                Button {
+                    isShowingEditSheet = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .foregroundStyle(.white)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(GlassCircleButtonStyle())
+                .padding(.trailing, Theme.Layout.screenInset)
+                .padding(.top, 52)
+            }
+        }
         .navigationBarHidden(true)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadTracks()
+        }
+        .sheet(isPresented: $isShowingEditSheet) {
+            PlaylistEditView(playlist: album) { updatedAlbum in
+                playlistTitle = updatedAlbum.title
+                playlistDescription = updatedAlbum.artist
+                playlistCoverURL = updatedAlbum.artworkURL
+            } onDelete: {
+                dismiss()
+            }
         }
     }
 
@@ -84,7 +121,7 @@ struct PlaylistDetailView: View {
         VStack(spacing: 20) {
             // Album cover image with ambient glow
             ZStack {
-                AsyncImage(url: album.artworkURL) { phase in
+                AsyncImage(url: playlistCoverURL) { phase in
                     if let image = phase.image {
                         image
                             .resizable()
@@ -97,7 +134,7 @@ struct PlaylistDetailView: View {
                 }
                 .frame(width: 180, height: 180)
                 
-                AsyncImage(url: album.artworkURL) { phase in
+                AsyncImage(url: playlistCoverURL) { phase in
                     if let image = phase.image {
                         image
                             .resizable()
@@ -122,7 +159,7 @@ struct PlaylistDetailView: View {
             }
 
             VStack(spacing: 6) {
-                Text(album.title)
+                Text(playlistTitle)
                     .font(.system(size: 26, weight: .black, design: .rounded))
                     .tracking(-0.3)
                     .foregroundStyle(.white)
@@ -130,7 +167,7 @@ struct PlaylistDetailView: View {
                     .padding(.horizontal, 24)
 
                 HStack(spacing: 8) {
-                    Text(album.artist)
+                    Text(playlistDescription)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.Palette.textSecondary)
                 }
