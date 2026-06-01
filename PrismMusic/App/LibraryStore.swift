@@ -20,6 +20,10 @@ final class LibraryStore {
     /// when they're not in the current playlist.
     private(set) var likedTracks: [Track]
 
+    /// Cached user playlists.
+    private(set) var playlists: [Album] = []
+    private(set) var isLoadingPlaylists = false
+
     private let api: APIClient?
     private let settings: SettingsStore?
 
@@ -63,7 +67,10 @@ final class LibraryStore {
     }
 
     func syncWithServer() async {
-        guard let api, let settings, settings.isLoggedIn else { return }
+        guard let api, let settings, settings.isLoggedIn else {
+            self.playlists = []
+            return
+        }
         do {
             let serverLikes = try await api.fetchLikedTracks(userId: settings.userId)
             self.likedTracks = serverLikes
@@ -72,6 +79,7 @@ final class LibraryStore {
         } catch {
             print("[LibraryStore] Failed to sync likes with server: \(error)")
         }
+        await fetchPlaylists()
     }
 
     func importYandexTracks(_ tracks: [Track]) -> Int {
@@ -113,6 +121,57 @@ final class LibraryStore {
                     print("[LibraryStore] Failed to replace liked track on server: \(error)")
                 }
             }
+        }
+    }
+
+    func fetchPlaylists() async {
+        guard let api, let settings, settings.isLoggedIn else { return }
+        isLoadingPlaylists = true
+        do {
+            self.playlists = try await api.fetchUserPlaylists(userId: settings.userId)
+        } catch {
+            print("[LibraryStore] Failed to fetch playlists: \(error)")
+        }
+        isLoadingPlaylists = false
+    }
+
+    func createPlaylist(name: String, description: String) async -> Album? {
+        guard let api, let settings, settings.isLoggedIn else { return nil }
+        do {
+            let newPlaylist = try await api.createPlaylist(userId: settings.userId, name: name, description: description)
+            self.playlists.insert(newPlaylist, at: 0)
+            return newPlaylist
+        } catch {
+            print("[LibraryStore] Failed to create playlist: \(error)")
+            return nil
+        }
+    }
+
+    func deletePlaylist(_ playlist: Album) async {
+        guard let api, let settings, settings.isLoggedIn else { return }
+        do {
+            try await api.deletePlaylist(playlistId: playlist.id)
+            self.playlists.removeAll { $0.id == playlist.id }
+        } catch {
+            print("[LibraryStore] Failed to delete playlist: \(error)")
+        }
+    }
+
+    func addTrack(_ track: Track, to playlist: Album) async {
+        guard let api, let settings, settings.isLoggedIn else { return }
+        do {
+            try await api.addTrackToPlaylist(playlistId: playlist.id, track: track)
+        } catch {
+            print("[LibraryStore] Failed to add track to playlist: \(error)")
+        }
+    }
+
+    func removeTrack(_ track: Track, from playlist: Album) async {
+        guard let api, let settings, settings.isLoggedIn else { return }
+        do {
+            try await api.removeTrackFromPlaylist(playlistId: playlist.id, trackId: track.id)
+        } catch {
+            print("[LibraryStore] Failed to remove track from playlist: \(error)")
         }
     }
 

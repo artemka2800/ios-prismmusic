@@ -168,6 +168,31 @@ struct DailyMixesResponse: Decodable, Sendable {
     let mixes: [Album]
 }
 
+struct UserPlaylistDTO: Decodable, Sendable {
+    let id: String
+    let name: String
+    let description: String?
+    let coverUrl: String?
+    let isSystem: Bool?
+    let tracks: [Track]?
+
+    var toAlbum: Album {
+        Album(
+            id: id,
+            title: name,
+            artist: description ?? "Мой плейлист",
+            year: nil,
+            cover: coverUrl.flatMap { URL(string: $0) },
+            source: .other,
+            tracks: tracks
+        )
+    }
+}
+
+struct PlaylistSuccessResponse: Decodable, Sendable {
+    let success: Bool
+}
+
 /// Dynamic payload structures for Cross-Device Sync
 struct SyncResponse: Decodable, Sendable {
     let success: Bool?

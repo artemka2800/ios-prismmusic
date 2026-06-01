@@ -17,6 +17,7 @@ struct TrackRowView: View {
     var onTap: () -> Void
     var onLikeToggle: (() -> Void)?
     var liked: Bool = false
+    var onRemoveTrack: (() -> Void)? = nil
 
     var body: some View {
         Button(action: onTap) {
@@ -139,6 +140,26 @@ struct TrackRowView: View {
                         liked ? "Удалить из любимых" : "В любимые",
                         systemImage: liked ? "heart.fill" : "heart"
                     )
+                }
+            }
+            
+            if app.settings.isLoggedIn && !app.library.playlists.isEmpty {
+                Menu("Добавить в плейлист") {
+                    ForEach(app.library.playlists) { playlist in
+                        Button(playlist.title) {
+                            Task {
+                                await app.library.addTrack(track, to: playlist)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let onRemoveTrack {
+                Button(role: .destructive) {
+                    onRemoveTrack()
+                } label: {
+                    Label("Удалить из плейлиста", systemImage: "trash")
                 }
             }
         }

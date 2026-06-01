@@ -182,7 +182,15 @@ struct PlaylistDetailView: View {
                         }
                     },
                     onLikeToggle: { app.library.toggleLike(track) },
-                    liked: app.library.isLiked(track)
+                    liked: app.library.isLiked(track),
+                    onRemoveTrack: album.source == .other ? {
+                        Task {
+                            await app.library.removeTrack(track, from: album)
+                            withAnimation {
+                                self.tracks.removeAll { $0.id == track.id }
+                            }
+                        }
+                    } : nil
                 )
             }
         }

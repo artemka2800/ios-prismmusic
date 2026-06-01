@@ -98,6 +98,10 @@ final class APIClient {
 
     /// `GET /api/music/playlist?id=...&source=...` — fetches tracks for a playlist/album.
     func playlistTracks(id: String, source: String) async throws -> [Track] {
+        if source == "other" || source == "local" || (source == "system" && !id.hasPrefix("daily_mix_") && !id.hasPrefix("radio_")) {
+            let details = try await fetchPlaylistDetails(playlistId: id)
+            return details.tracks ?? []
+        }
         let items = [
             URLQueryItem(name: "id", value: id),
             URLQueryItem(name: "source", value: source),
@@ -250,6 +254,93 @@ final class APIClient {
             as: DailyMixesResponse.self
         )
         return response.mixes
+    }
+
+    /// `GET /api/library/playlists?userId=...`
+    func fetchUserPlaylists(userId: String) async throws -> [Album] {
+        let response = try await executeWithFailover(
+            path: "/api/library/playlists",
+            queryItems: [URLQueryItem(name: "userId", value: userId)],
+            as: [UserPlaylistDTO].self
+        )
+        return response.map { $0.toAlbum }
+    }
+
+    /// `POST /api/library/playlists`
+    func createPlaylist(userId: String, name: String, description: String) async throws -> Album {
+        let body: [String: Any] = [
+            "userId": userId,
+            "name": name,
+            "description": description
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        let response = try await executeWithFailover(
+            path: "/api/library/playlists",
+            method: "POST",
+            bodyData: bodyData,
+            as: UserPlaylistDTO.self
+        )
+        return response.toAlbum
+    }
+
+    /// `DELETE /api/library/playlists?id=...`
+    func deletePlaylist(playlistId: String) async throws {
+        _ = try await executeWithFailover(
+            path: "/api/library/playlists",
+            method: "DELETE",
+            queryItems: [URLQueryItem(name: "id", value: playlistId)],
+            as: PlaylistSuccessResponse.self
+        )
+    }
+
+    /// `POST /api/library/playlists/tracks`
+    func addTrackToPlaylist(playlistId: String, track: Track) async throws {
+        let idPart = track.id.components(separatedBy: ":").last ?? track.id
+        let sourcePart = track.source?.rawValue ?? "soundcloud"
+        let trackDict: [String: Any] = [
+            "id": idPart,
+            "title": track.title,
+            "artist": track.artist,
+            "coverUrl": track.cover?.absoluteString ?? "",
+            "duration": Int(track.durationSeconds ?? 0),
+            "source": sourcePart
+        ]
+        let body: [String: Any] = [
+            "playlistId": playlistId,
+            "track": trackDict
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        _ = try await executeWithFailover(
+            path: "/api/library/playlists/tracks",
+            method: "POST",
+            bodyData: bodyData,
+            as: PlaylistSuccessResponse.self
+        )
+    }
+
+    /// `DELETE /api/library/playlists/tracks?playlistId=...&trackId=...`
+    func removeTrackFromPlaylist(playlistId: String, trackId: String) async throws {
+        let rawTrackId = trackId.components(separatedBy: ":").last ?? trackId
+        let queryItems = [
+            URLQueryItem(name: "playlistId", value: playlistId),
+            URLQueryItem(name: "trackId", value: rawTrackId)
+        ]
+        _ = try await executeWithFailover(
+            path: "/api/library/playlists/tracks",
+            method: "DELETE",
+            queryItems: queryItems,
+            as: PlaylistSuccessResponse.self
+        )
+    }
+
+    /// `GET /api/library/playlists?id=...`
+    func fetchPlaylistDetails(playlistId: String) async throws -> Album {
+        let response = try await executeWithFailover(
+            path: "/api/library/playlists",
+            queryItems: [URLQueryItem(name: "id", value: playlistId)],
+            as: UserPlaylistDTO.self
+        )
+        return response.toAlbum
     }
 
     /// `POST /api/user/sync`
