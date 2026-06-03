@@ -26,7 +26,9 @@ struct TrackRowView: View {
                     if let image = phase.image {
                         image.resizable().scaledToFill()
                     } else {
-                        Color.white.opacity(0.06)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
+                            .shimmering()
                     }
                 }
                 .frame(width: 50, height: 50)
