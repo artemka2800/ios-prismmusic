@@ -76,3 +76,8 @@ enum Theme {
         static let cornerMedium: CGFloat = 12
     }
 }
+
+extension Color {
+    static let emerald = Color(red: 0.05, green: 0.78, blue: 0.43)
+}
+

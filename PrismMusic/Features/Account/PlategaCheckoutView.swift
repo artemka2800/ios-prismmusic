@@ -87,7 +87,7 @@ struct PlategaCheckoutView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("БЕЗОПАСНАЯ ОПЛАТА")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.emerald)
+                    .foregroundStyle(Color.emerald)
                     .tracking(1.5)
                 
                 HStack(spacing: 4) {
@@ -96,7 +96,7 @@ struct PlategaCheckoutView: View {
                         .foregroundStyle(.white)
                     Text(".io")
                         .font(.system(size: 24, weight: .black))
-                        .foregroundStyle(.emerald)
+                        .foregroundStyle(Color.emerald)
                 }
             }
 
@@ -186,7 +186,7 @@ struct PlategaCheckoutView: View {
                             .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
                     )
                     .foregroundStyle(.white)
-                    .tint(.emerald)
+                    .tint(Color.emerald)
                     .onChange(of: cardNumber) { _, newValue in
                         let clean = newValue.replacingOccurrences(of: " ", with: "")
                             .filter { $0.isNumber }
@@ -400,7 +400,7 @@ struct PlategaCheckoutView: View {
                     Spacer()
                     Text("Сеть TRC-20")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.emerald)
+                        .foregroundStyle(Color.emerald)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.emerald.opacity(0.12))
@@ -446,7 +446,7 @@ struct PlategaCheckoutView: View {
                         } label: {
                             Text(walletCopied ? "Copied" : "Copy")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(walletCopied ? .emerald : .white)
+                                .foregroundStyle(walletCopied ? Color.emerald : .white)
                                 .padding(.horizontal, 14)
                                 .frame(height: 42)
                                 .background(Color.white.opacity(0.05))
@@ -488,7 +488,7 @@ struct PlategaCheckoutView: View {
     private var processingStepView: some View {
         VStack(spacing: 24) {
             ProgressView()
-                .tint(.emerald)
+                .tint(Color.emerald)
                 .controlSize(.large)
                 .padding(.top, 40)
             
@@ -517,7 +517,7 @@ struct PlategaCheckoutView: View {
                 
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 48))
-                    .foregroundStyle(.emerald)
+                    .foregroundStyle(Color.emerald)
             }
             .padding(.top, 30)
 
