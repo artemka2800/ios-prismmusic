@@ -70,14 +70,26 @@ final class SettingsStore {
         }
     }
 
+    /// Authenticated user role from Next.js server.
+    var role: String {
+        didSet {
+            UserDefaults.standard.set(role, forKey: Keys.role)
+        }
+    }
+
     var isLoggedIn: Bool {
         !userId.isEmpty
+    }
+
+    var isPremium: Bool {
+        role == "premium" || role == "admin" || role == "creator"
     }
 
     func logout() {
         userId = ""
         username = ""
         yandexToken = ""
+        role = "free"
     }
 
     // MARK: - Init
@@ -90,6 +102,7 @@ final class SettingsStore {
         self.animatedCover = UserDefaults.standard.object(forKey: Keys.animatedCover) as? Bool ?? true
         self.userId = UserDefaults.standard.string(forKey: Keys.userId) ?? ""
         self.username = UserDefaults.standard.string(forKey: Keys.username) ?? ""
+        self.role = UserDefaults.standard.string(forKey: Keys.role) ?? "free"
     }
 
     private enum Keys {
@@ -99,6 +112,7 @@ final class SettingsStore {
         static let animatedCover = "prism.animatedCover"
         static let userId = "prism.userId"
         static let username = "prism.username"
+        static let role = "prism.role"
     }
 }
 

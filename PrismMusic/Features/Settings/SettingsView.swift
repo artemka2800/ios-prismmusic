@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var showImportAlert = false
     @State private var importAlertMessage = ""
     @State private var isDownloadingAll = false
+    @State private var showCheckoutSheet = false
 
     var body: some View {
         NavigationStack {
@@ -101,15 +102,42 @@ struct SettingsView: View {
                                 .padding(.horizontal, 4)
                             
                             VStack(alignment: .leading, spacing: 12) {
-                                Toggle(isOn: Binding(
-                                    get: { app.settings.immersiveMode },
-                                    set: { app.settings.immersiveMode = $0 }
-                                )) {
+                                HStack {
                                     Label("Immersive фон", systemImage: "sparkles")
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(app.settings.isPremium ? .white : .white.opacity(0.6))
                                         .font(.system(size: 14, weight: .medium))
+                                    
+                                    Spacer()
+                                    
+                                    if app.settings.isPremium {
+                                        Toggle("", isOn: Binding(
+                                            get: { app.settings.immersiveMode },
+                                            set: { app.settings.immersiveMode = $0 }
+                                        ))
+                                        .labelsHidden()
+                                        .tint(.white)
+                                    } else {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(.yellow)
+                                            
+                                            Text("Premium")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundStyle(.yellow)
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.yellow.opacity(0.15))
+                                        .cornerRadius(20)
+                                    }
                                 }
-                                .tint(.white)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if !app.settings.isPremium {
+                                        showCheckoutSheet = true
+                                    }
+                                }
                             }
                             .padding(14)
                             .prismGlass(cornerRadius: 16)
@@ -285,6 +313,9 @@ struct SettingsView: View {
                 NavigationStack {
                     RealTimeLogsView(isPresented: $showDebugLogs)
                 }
+            }
+            .sheet(isPresented: $showCheckoutSheet) {
+                PlategaCheckoutView()
             }
         }
         .onAppear {

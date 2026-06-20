@@ -12,6 +12,7 @@ struct AccountView: View {
     @State private var isAuthenticating = false
     @State private var authError: String = ""
     @State private var syncFlash = false
+    @State private var showCheckoutSheet = false
 
     var body: some View {
         NavigationStack {
@@ -37,6 +38,9 @@ struct AccountView: View {
             }
             .navigationBarHidden(true)
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showCheckoutSheet) {
+                PlategaCheckoutView()
+            }
         }
     }
 
@@ -60,9 +64,29 @@ struct AccountView: View {
                     .foregroundStyle(Theme.Palette.textSecondary)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(app.settings.username)
-                        .font(Theme.Typography.title)
-                        .foregroundStyle(.white)
+                    HStack(spacing: 8) {
+                        Text(app.settings.username)
+                            .font(Theme.Typography.title)
+                            .foregroundStyle(.white)
+                        
+                        if app.settings.isPremium {
+                            Text("PREMIUM")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Color.black)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(LinearGradient(colors: [Color(red: 0.95, green: 0.75, blue: 0.2), Color(red: 1.0, green: 0.85, blue: 0.4)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .cornerRadius(4)
+                        } else {
+                            Text("FREE")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.white.opacity(0.12))
+                                .cornerRadius(4)
+                        }
+                    }
                     
                     Text("ID: \(app.settings.userId.prefix(8))...")
                         .font(Theme.Typography.caption)
@@ -71,8 +95,60 @@ struct AccountView: View {
                 Spacer()
             }
             
-            Divider()
-                .background(Color.white.opacity(0.1))
+            
+            if !app.settings.isPremium {
+                Button {
+                    showCheckoutSheet = true
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Label("Активировать PrismMusic Premium", systemImage: "sparkles")
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Theme.Palette.textTertiary)
+                        }
+                        
+                        Text("Получи полный доступ к кастомизации интерфейса, иммерсивным эффектам и эксклюзивным темам.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.Palette.textSecondary)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(2)
+                    }
+                    .padding(14)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color.emerald.opacity(0.18),
+                                Color.purple.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.emerald.opacity(0.3),
+                                        Color.purple.opacity(0.15)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.5
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                Divider()
+                    .background(Color.white.opacity(0.1))
+            }
             
             // Sync status
             Button {
@@ -238,6 +314,11 @@ struct AccountView: View {
                 // Success! Save details
                 app.settings.userId = response.id
                 app.settings.username = response.username
+                if let role = response.role {
+                    app.settings.role = role
+                } else {
+                    app.settings.role = "free"
+                }
                 if let serverYandexToken = response.token, !serverYandexToken.isEmpty {
                     app.settings.yandexToken = serverYandexToken
                 }

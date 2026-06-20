@@ -160,6 +160,18 @@ final class APIClient {
         )
     }
 
+    /// `POST /api/user/subscribe`
+    func subscribe(userId: String, action: String) async throws -> UserResponse {
+        let body = ["userId": userId, "action": action]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        return try await executeWithFailover(
+            path: "/api/user/subscribe",
+            method: "POST",
+            bodyData: bodyData,
+            as: UserResponse.self
+        )
+    }
+
     /// `GET /api/library/likes`
     func fetchLikedTracks(userId: String) async throws -> [Track] {
         return try await executeWithFailover(
